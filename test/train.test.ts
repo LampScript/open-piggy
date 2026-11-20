@@ -119,3 +119,50 @@ test('empty official result remains empty; incorrect result date fails', async()
   assert.deepEqual(empty.itemList,[]);
   await assert.rejects(searchTrain(options,clientFor(async()=>({...success(),data:{depDate:'2027-02-05',trains:[train]}})),new CookieJar()),hasCode('UPSTREAM_SCHEMA_CHANGED'));
 });
+
+test('hour windows include both boundary hour buckets and use station-local arrival dates', async () => {
+  const routes = [
+    {...train, trainNo:'BEFORE', depTimeFull:'2027-02-04 05:59:59', arrTimeFull:'2027-02-05 23:00:00'},
+    {...train, trainNo:'FIRST', depTimeFull:'2027-02-04 06:00:00', arrTimeFull:'2027-02-05 23:00:00'},
+    {...train, trainNo:'LAST', depTimeFull:'2027-02-04 06:59:59', arrTimeFull:'2027-02-05 23:59:59'},
+    {...train, trainNo:'AFTER', depTimeFull:'2027-02-04 07:00:00', arrTimeFull:'2027-02-05 23:00:00'},
+    {...train, trainNo:'WRONG_ARRIVAL', depTimeFull:'2027-02-04 06:30:00', arrTimeFull:'2027-02-05 22:59:59'},
+  ];
+  const result = await searchTrain({...options, depHourStart:'6', depHourEnd:'6', arrHourStart:'23', arrHourEnd:'23'},
+    clientFor(async()=>success(routes)),new CookieJar()) as {itemList:{trainNo:string}[]};
+  assert.deepEqual(result.itemList.map(item=>item.trainNo),['FIRST','LAST']);
+});
+
+test('one-sided hour filters accept midnight and a complete final hour', async () => {
+  const routes = [
+    {...train, trainNo:'MIDNIGHT', depTimeFull:'2027-02-04 00:00:00', arrTimeFull:'2027-02-04 23:59:59'},
+    {...train, trainNo:'LATER', depTimeFull:'2027-02-04 01:00:00', arrTimeFull:'2027-02-05 00:00:00'},
+  ];
+  const result = await searchTrain({...options, depHourEnd:'0', arrHourStart:'23'},
+    clientFor(async()=>success(routes)),new CookieJar()) as {itemList:{trainNo:string}[]};
+  assert.deepEqual(result.itemList.map(item=>item.trainNo),['MIDNIGHT']);
+});
+
+test('invalid or reversed hour windows fail before network access', async () => {
+  const client = clientFor(async()=>{throw new Error('Must not query invalid hours');});
+  for (const filters of [
+    {depHourStart:'24'}, {depHourEnd:'-1'}, {arrHourStart:'1.5'}, {arrHourEnd:'23x'},
+    {depHourStart:'18',depHourEnd:'6'}, {arrHourStart:'23',arrHourEnd:'0'},
+  ]) {
+    await assert.rejects(searchTrain({...options,...filters},client,new CookieJar()),hasCode('INVALID_ARGUMENT'));
+  }
+});
+
+test('unverified transfer mode and transfer city are explicit capability failures', async () => {
+  const client = clientFor(async()=>{throw new Error('Must not send unverified transfer query');});
+  for (const filters of [{journeyType:'2'}, {transferCity:'南京'}]) {
+    await assert.rejects(searchTrain({...options,...filters},client,new CookieJar()),hasCode('CAPABILITY_UNVERIFIED'));
+  }
+});
+
+test('malformed station-local timestamps fail instead of bypassing hour filters', async () => {
+  for (const bad of ['2027-02-04 25:00:00','2027-02-04 06:60:00','not-a-time']) {
+    await assert.rejects(searchTrain({...options,depHourStart:'6'},
+      clientFor(async()=>success([{...train,depTimeFull:bad}])),new CookieJar()),hasCode('UPSTREAM_SCHEMA_CHANGED'));
+  }
+});

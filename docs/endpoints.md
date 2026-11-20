@@ -28,7 +28,7 @@ GET `https://sijipiao.fliggy.com/ie/flight_search_result_poller.do`:
 
 Business success is `status:200`, flight candidates under `data.flightItems[].flightInfo[]`, seller quotes under `data.productItems[]`. Parser strips session/query identifiers from output. `totalAdultPrice`, `adultTax` are integer cents. Tax inclusion follows the page's nonnegative `adultTax` branch. Negative tax sentinel remains unknown. Cabin filtering uses actual `cabinInfo` names.
 
-Live own-session HTTP acceptance: SHA–LAX 2027-02-04 / 2027-02-12, AC026+AC554 / AC551+AC025. Durations 906 / 1000 minutes. Quote data returned real sellers and multiple cabin classes, prompting tested cents conversion and explicit cabin filtering. Historical quotes are not current offers. Lowest-agent tab only; candidate selection is bounded and explicitly nonexhaustive. Baggage, fare brand and protected-connection conditions remain unverified. Full fixed-date and filter parity is not claimed.
+Live own-session HTTP acceptance: SHA–LAX 2027-02-04 / 2027-02-12, AC026+AC554 / AC551+AC025. Durations 906 / 1000 minutes. Quote data returned real sellers and multiple cabin classes, prompting tested cents conversion and explicit cabin filtering. Historical quotes are not current offers. Lowest-agent tab only; candidate selection is bounded and explicitly nonexhaustive. Baggage, fare brand and protected-connection conditions remain unverified. Preview.2 additionally supports sequential date-pair ranges, sort1–8, inclusive local hour buckets, transfer labels/codes and exact outbound/return segment sequences. Baggage/fare-rule and GDS-tab parity is still incomplete.
 
 ### Direct trains (partial)
 
@@ -41,7 +41,7 @@ GET `https://h5api.m.taobao.com/h5/mtop.trip.train.station2stationsearch2/1.0/`;
 
 Success: `ret` includes `SUCCESS`, result data includes matching date and train list. Prices are cents; the official renderer divides by 100. Live anonymous fresh-cookie-jar request Shanghai–Beijing 2027-02-04 returned 55 schedules, including G532: 347 minutes, second class starting price CNY576. `bookable:0` and future `preSellDateStr` are preserved, not interpreted as available tickets. CLI live acceptance matched these fields.
 
-Supported subset: direct one-way, number/seat/price/duration filters and sorting. No round trips, transfer search, date ranges or hour-window filters.
+Supported subset: direct trains, number/seat/price/duration/hour filters and sorting. Preview.2 adds sequential date ranges and independently queried outbound/return sums; it rejects impossible return-before-arrival combinations. This does not implement a bundled round-trip fare or transfer inventory.
 
 ### Popular attractions (partial)
 
@@ -51,12 +51,13 @@ GET `https://s.alitrip.com/scenic/ajax/HotScenicByDest.htm?num=10&format=json&q=
 
 No dated availability, grade/category or keyword filters. Prices are starting prices; currency CNY follows the consumer site's presentation, tax unknown.
 
-## Remaining blocks
+## Hotel verification and remaining blocks
 
-- Hotels: own-session GET `https://hotel.fliggy.com/hotel_list3.htm?city=310100&cityName=上海&checkIn=2026-12-01&checkOut=2026-12-02` returned server-rendered hotel detail links, but later requests encountered official verification. Exact normalized result parsing and accepted filters are not yet verified. Do not continue around the challenge.
+- Hotels (previous investigation, superseded by verified API below): own-session GET `https://hotel.fliggy.com/hotel_list3.htm?city=310100&cityName=上海&checkIn=2026-12-01&checkOut=2026-12-02` returned server-rendered hotel detail links, but later requests encountered official verification. A later ordinary same-session API query succeeded without any challenge handling; verified parsing/filters are now implemented as described in hotel-evidence.md. Do not continue around a challenge if one returns.
+- Mainland hotels / Marriott brand hotels (HTTP verified, partial): GET `https://hotel.fliggy.com/ajax/hotelList.htm` with actual resolved city, dates, page and price sorting. Brand filters use dynamic `allHotelBrands` facet IDs. `max-price` is explicitly local to one result page, and nightly/stay-total, taxes and availability remain unknown. See [hotel-evidence.md](hotel-evidence.md) for source, schema and live checks.
 - City suggestions: `https://hotel.alitrip.com/ajax/CitySuggest.do?t=0&q=上海&callback=openPiggy` returned real `cityCode:310100` with own session. This alone is not hotel search.
 - Keyword search (HTTP verified, partial): GET `https://travelsearch.fliggy.com/async/queryItemResult.do?searchType=product&keyword=<query>&pagenum=<page>`, declared in the public search script's `requestRemoteData`. Business success requires nested `success:true`. Actual items under `data.data.itemProducts.data.list[].auctions[].fields`; page metadata under `itemPagenum`. Title uses `title || name`, price uses `discountPrice || price`, zero/absent price is unknown. Own-session query 上海 returned real product titles and prices, with validated requested query/page. `--page` requests one actual page and `--limit` only limits local output; no exhaustive inventory, dated price, availability or brand claims. Titles are stripped of markup and links are constrained to official HTTPS hosts.
-- Marriott hotel / package: no verified dedicated inventory/filter contract found in the bounded inspected resources.
+- Marriott packages: no verified package-product contract. Marriott hotel queries now use genuine brand facets, not keyword/title substitution.
 - AI search: no verified corresponding consumer-web natural-language endpoint found; no external model substitute.
 
 Homepage evidence: `https://g.alicdn.com/trip/rc-pc-home/1.1.28/index.js`. Keyword script: `https://travelsearch.fliggy.com/assets/index/index.js?t=1730169098172`. Hotel scripts: `https://g.alicdn.com/trip/hotel-search/0.5.24/config-min.js`, `deps-min.js`.

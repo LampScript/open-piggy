@@ -17,4 +17,12 @@ No real credentials or full authenticated captures are stored in tests. CI does 
 
 ## Pending stable acceptance
 
-Flight baggage/fare conditions and full filters, train transfers/round trips/ranges, full POI filters, hotel parsing and filters, Marriott-specific inventory/packages, and consumer-web AI search. Cross-platform QR login needs device acceptance on each OS. No stable release until these pass; no browser query fallback.
+Flight baggage/fare conditions and GDS fares, train transfers and full provider parity, full POI filters, overseas/advanced hotel filters, Marriott packages, and consumer-web AI search. Cross-platform QR login needs device acceptance on each OS. No stable release until these pass; no browser query fallback.
+
+## Preview.2 alignment checks
+
+- Direct train date ranges (2027-02-03..04), 06-hour bucket and second-class filtering succeeded over HTTP. Independent Shanghai/Beijing return tickets (02-04 /02-12) returned separate one-way schedules and an explicitly labeled sum, with presale/bookability preserved.
+- Mainland hotel API and official Marriott facet filters succeeded with the tool's login session. Source and limitations: hotel-evidence.md. Hotel responses can drift; changed shapes fail explicitly.
+- New regression coverage: date-pair budgets before large Cartesian allocation, failed-pair propagation, chronology of independent return tickets, all transport sort modes, exact flight sequence and preselected return-link type, local hour windows, and hotel city/brand/date response integrity.
+
+- Preview.2 live flight acceptance queried both 2027-02-04 and 02-05 with a fixed 02-12 return, exact AC segment sequences, 温哥华 transfer filter, economy, strict duration<20h, departure-hour filter and duration sorting. Both requested date pairs completed; only the 02-04 combination matched the exact constraints. A non-match is not a claim that the other day has no inventory.

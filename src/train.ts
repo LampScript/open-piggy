@@ -10,6 +10,8 @@ import type { WebClient } from './http.js';
 const endpoint = 'https://h5api.m.taobao.com/h5/mtop.trip.train.station2stationsearch2/1.0/';
 const api = 'mtop.trip.train.station2stationsearch2';
 const appKey = '12574478';
+const hourSchema = z.string().regex(/^(?:[01]?\d|2[0-3])$/);
+const localDateTimeSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}[ T](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/);
 const inputSchema = z.object({
   origin: z.string().trim().min(1),
   destination: z.string().trim().min(1),
@@ -21,6 +23,10 @@ const inputSchema = z.object({
   sortType: z.enum(['1','2','3','4','5','6','7','8']).optional(),
   limit: z.string().regex(/^[1-9]\d*$/).optional(),
   journeyType: z.literal('1').optional(),
+  depHourStart: hourSchema.optional(),
+  depHourEnd: hourSchema.optional(),
+  arrHourStart: hourSchema.optional(),
+  arrHourEnd: hourSchema.optional(),
 });
 const envelopeSchema = z.object({
   api: z.literal(api),
@@ -35,7 +41,7 @@ const seatSchema = z.object({
 });
 const trainSchema = z.object({
   trainNo: z.string(), departStation: z.string(), arriveStation: z.string(),
-  depTimeFull: z.string(), arrTimeFull: z.string(),
+  depTimeFull: localDateTimeSchema, arrTimeFull: localDateTimeSchema,
   costTimeInt: z.number().int().nonnegative(), price: z.number().int().nonnegative(),
   bookable: z.union([z.literal(0), z.literal(1)]),
   preSellDateStr: z.string().optional(), seatTypes: z.array(seatSchema),
@@ -94,9 +100,20 @@ export async function searchTrain(
   if (unsupported.length) {
     throw new PiggyError('CAPABILITY_UNVERIFIED', `Train options are not verified: ${unsupported.map(([key]) => key).join(', ')}.`);
   }
+  if (options.journeyType === '2') {
+    throw new PiggyError('CAPABILITY_UNVERIFIED', 'Train transfer search has no verified seat, price and duration schema yet.');
+  }
   const input = inputSchema.safeParse(options);
   if (!input.success) {
-    throw new PiggyError('INVALID_ARGUMENT', 'Train search requires origin, destination and dep-date (YYYY-MM-DD).');
+    throw new PiggyError('INVALID_ARGUMENT', 'Train search requires origin, destination and dep-date (YYYY-MM-DD); hour filters must be integers from 0 to 23.');
+  }
+  for (const [start, end] of [
+    [input.data.depHourStart, input.data.depHourEnd],
+    [input.data.arrHourStart, input.data.arrHourEnd],
+  ]) {
+    if (start !== undefined && end !== undefined && Number(start) > Number(end)) {
+      throw new PiggyError('INVALID_ARGUMENT', 'Train hour windows must have start <= end; hours range from 0 to 23.');
+    }
   }
   const data = JSON.stringify({
     depLocation: input.data.origin,
@@ -128,9 +145,17 @@ export async function searchTrain(
     'hard sleeper': '硬卧', 'soft sleeper': '软卧',
   };
   const wantedSeats = input.data.seatClassName?.split(',').map(value => englishSeats[value.trim()] ?? value.trim());
+  const inHourWindow = (dateTime: string, start: string | undefined, end: string | undefined): boolean => {
+    // These are station-local timestamps, parsed at the response boundary.
+    // End hours include their entire hour: end=23 includes 23:59:59.
+    const hour = Number(dateTime.slice(11, 13));
+    return (start === undefined || hour >= Number(start)) && (end === undefined || hour <= Number(end));
+  };
   let trains = parsed.data.trains.filter(train =>
     (!wantedTrains || wantedTrains.includes(train.trainNo.toUpperCase())) &&
-    (!input.data.totalDurationHour || train.costTimeInt < Number(input.data.totalDurationHour) * 60),
+    (!input.data.totalDurationHour || train.costTimeInt < Number(input.data.totalDurationHour) * 60) &&
+    inHourWindow(train.depTimeFull, input.data.depHourStart, input.data.depHourEnd) &&
+    inHourWindow(train.arrTimeFull, input.data.arrHourStart, input.data.arrHourEnd),
   ).map(train => {
     const seats = train.seatTypes.filter(seat => !wantedSeats || wantedSeats.includes(seat.seatName));
     // Official list renderer displays props.price / 100 as 元起.
@@ -158,7 +183,7 @@ export async function searchTrain(
     warnings: [
       'Schedule and starting prices only: bookable=false and future presale dates do not establish currently purchasable tickets.',
       'Seat stockCode is the upstream value, not a promised number of available seats.',
-      'No transfer, round-trip, date-range or departure-hour filtering; unsupported options fail explicitly.',
+      'Transfer search is not verified. Each query covers one departure date and one direction; unsupported options fail explicitly.',
       'The booking link opens the official route list, not a guaranteed reservation.',
     ],
   };

@@ -8,11 +8,11 @@ Reviewed on 2026-11-20 against the official [FlyAI skill repository](https://git
 
 | Command | Required documented argument | Pure-HTTP live verification |
 | --- | --- | --- |
-| `search-flight` | `--origin` | Partial: fixed-date own-session HTTP quotes verified; full filters and fare rules pending |
-| `search-train` | `--origin` | Partial: direct one-way schedules and seat fares verified; future schedules may not be bookable |
-| `search-hotel` | `--dest-name` | Not yet verified |
+| `search-flight` | `--origin` | Partial: live quotes, sequential date ranges, eight sort modes, hour/city filters and exact segment selection; fare rules pending |
+| `search-train` | `--origin` | Partial: direct schedules, ranges, hour filters and independent return ticket sums; no transfer inventory |
+| `search-hotel` | `--dest-name` | Partial: mainland dated queries, price sorting, city resolution, page and keyword verified |
 | `search-poi` | `--city-name` | Partial: city popular recommendations verified, not full POI filtering |
-| `search-marriott-hotel` | `--dest-name` | Not yet verified |
+| `search-marriott-hotel` | `--dest-name` | Partial: mainland official brand-facet filtering verified; not full global portfolio |
 | `search-marriott-package` | `--keyword` | Not yet verified |
 | `keyword-search` | `--query` | Partial: own-session HTTP product search and website pagination verified; starting prices only |
 | `ai-search` | `--query` | Not yet verified |

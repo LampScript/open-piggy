@@ -9,13 +9,17 @@ import { jarFromSession, loadSession } from './session.js';
 import { searchFlight, type FlightOptions } from './flight.js';
 import { searchPoi } from './poi.js';
 import { searchKeyword } from './keyword.js';
-import { searchTrain } from './train.js';
+import { searchHotel,searchMarriottHotel } from './hotel.js';
+import { searchTrainJourney } from './train-query.js';
+import {planDates,searchDatePairs,type TransportOptions} from './transport.js';
 export const capabilities = [
- {command:'search-flight',status:'experimental',evidence:'Fixed-date live own-session HTTP quotes verified; incomplete filters and fare rules remain preview limitations.'},
- {command:'search-train',status:'partial',evidence:'Direct station-to-station MTop search verified; unsupported filters fail explicitly.'},
+ {command:'search-flight',status:'partial',evidence:'Live HTTP flights, date-pair ranges, all sort orders, hour/transfer filters and exact segment matching; fare rules remain incomplete.'},
+ {command:'search-train',status:'partial',evidence:'Direct trains with date ranges, independent return tickets and hour filters; transfer inventory remains unverified.'},
  {command:'search-poi',status:'partial',evidence:'City popular-attraction recommendations verified over public HTTP.'},
  {command:'keyword-search',status:'partial',evidence:'Live own-session HTTP product search with explicit website pagination; starting prices only.'},
- ...['search-hotel','search-marriott-hotel','search-marriott-package','ai-search'].map(command=>({command,status:'blocked',evidence:'No corresponding pure-HTTP result query has been verified. See docs/endpoints.md.'}))
+ {command:'search-hotel',status:'partial',evidence:'Mainland dated hotel results, actual city resolution, price sorting and pagination verified.'},
+ {command:'search-marriott-hotel',status:'partial',evidence:'Marriott portfolio filters use dynamically resolved official brand facets; mainland destinations only.'},
+ ...['search-marriott-package','ai-search'].map(command=>({command,status:'blocked',evidence:'No corresponding pure-HTTP result query has been verified. See docs/endpoints.md.'}))
 ];
 function output(data: unknown) { console.log(JSON.stringify({status:0,message:'success',data})); }
 function blocked(command:string):never { throw new PiggyError('CAPABILITY_UNVERIFIED',`${command} is not implemented: no verified website HTTP result contract. This preview is not feature-aligned with FlyAI.`); }
@@ -26,45 +30,47 @@ function supported(options:Record<string,unknown>,keys:string[]):void {
 const date=z.iso.date();
 function dates(o:Record<string,unknown>):void {
  for(const key of ['depDate','backDate'])if(o[key]!==undefined && !date.safeParse(o[key]).success)throw new PiggyError('INVALID_ARGUMENT',`${key} must be a real YYYY-MM-DD date.`);
- if(o.backDate && String(o.backDate)<String(o.depDate))throw new PiggyError('INVALID_ARGUMENT','Return date must not precede departure date.');
+ if(o.backDate && o.depDate && String(o.backDate)<String(o.depDate))throw new PiggyError('INVALID_ARGUMENT','Return date must not precede departure date.');
  for(const key of ['totalDurationHour','maxPrice','limit'])if(o[key]!==undefined && (!/^\d+(\.\d+)?$/.test(String(o[key])) || Number(o[key])<=0))throw new PiggyError('INVALID_ARGUMENT',`${key} must be positive.`);
  if(o.limit!==undefined && (!Number.isInteger(Number(o.limit)) || Number(o.limit)>100))throw new PiggyError('INVALID_ARGUMENT','limit must be an integer from 1 through 100.');
 }
 function transport(command:Command):Command {
- return command.requiredOption('--origin <city>').option('--destination <city>').option('--dep-date <date>').option('--dep-date-start <date>').option('--dep-date-end <date>').option('--back-date <date>').option('--back-date-start <date>').option('--back-date-end <date>').option('--journey-type <1|2>').option('--seat-class-name <name>').option('--transport-no <numbers>').option('--transfer-city <city>').option('--dep-hour-start <hour>').option('--dep-hour-end <hour>').option('--arr-hour-start <hour>').option('--arr-hour-end <hour>').option('--total-duration-hour <hours>').option('--max-price <cny>').option('--sort-type <sort>');
+ return command.requiredOption('--origin <city>').option('--destination <city>').option('--dep-date <date>').option('--dep-date-start <date>').option('--dep-date-end <date>').option('--back-date <date>').option('--back-date-start <date>').option('--back-date-end <date>').option('--journey-type <1|2>').option('--seat-class-name <name>').option('--transport-no <numbers>').option('--transfer-city <city>').option('--dep-hour-start <hour>').option('--dep-hour-end <hour>').option('--arr-hour-start <hour>').option('--arr-hour-end <hour>').option('--total-duration-hour <hours>').option('--max-price <cny>').option('--sort-type <sort>').option('--max-date-pairs <number>','Sequential date-pair request budget (default 49)');
 }
-const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.1').exitOverride().configureOutput({outputError:()=>{}});
+const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.2').exitOverride().configureOutput({outputError:()=>{}});
 program.command('capabilities').description('Show verified capabilities and release blockers').action(()=>output({stableReady:false,capabilities}));
 const auth=program.command('auth').description('Official QR login; browser is used only here');
 auth.command('login').action(async()=>output(await authLogin()));auth.command('status').action(async()=>output(await authStatus()));auth.command('logout').action(async()=>output(await authLogout()));
-transport(program.command('search-flight').description('Experimental fixed-date flight queries using official web polling')).option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--experimental','Allow statically derived, not yet live-accepted flight parser').action(async o=>{
- supported(o,['origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental']);dates(o);
- if(!o.destination || !o.depDate)throw new PiggyError('INVALID_ARGUMENT','Fixed destination and --dep-date are required in this preview.');
+transport(program.command('search-flight').description('Live HTTP flights with date ranges, journey filters and exact segment sequences')).option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--experimental','Compatibility flag; fixed-date HTTP flight transport has passed live acceptance').option('--outbound-flights <numbers>','Exact outbound segment sequence').option('--return-flights <numbers>','Exact return segment sequence').action(async o=>{
+ supported(o,['origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental','depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs','transferCity','depHourStart','depHourEnd','arrHourStart','arrHourEnd','outboundFlights','returnFlights']);dates(o);
+ const pairs=planDates(o as TransportOptions);
+ if(!o.destination)throw new PiggyError('INVALID_ARGUMENT','--destination is required.');
+ if(o.returnFlights && !pairs.some(p=>p.backDate))throw new PiggyError('INVALID_ARGUMENT','--return-flights requires return dates.');
  if(o.journeyType && !['1','2'].includes(o.journeyType))throw new PiggyError('INVALID_ARGUMENT','journey-type must be 1 or 2.');
- if(o.sortType && !['1','3'].includes(o.sortType))throw new PiggyError('CAPABILITY_UNVERIFIED','Only price sort 1 and 3 have been implemented for flight quotes.');
- if(!o.experimental)throw new PiggyError('CAPABILITY_UNVERIFIED','Flight query is experimental pending live logged-in acceptance. Pass --experimental to explicitly test it.');
+
  const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
- output(await searchFlight(o as FlightOptions,client));
+ output(await searchDatePairs(o as TransportOptions,pairs,fixed=>searchFlight(fixed as FlightOptions,client)));
 });
 transport(program.command('search-train').description('Verified direct train search; may return future presale schedules')).option('--limit <number>','Limit returned trains after filtering').action(async o=>{
- supported(o,['origin','destination','depDate','journeyType','seatClassName','transportNo','totalDurationHour','sortType','maxPrice','limit']);dates(o);
- if(!o.destination || !o.depDate)throw new PiggyError('INVALID_ARGUMENT','--destination and --dep-date are required.');
- const jar=new CookieJar();output(await searchTrain(o,createClient(jar),jar));
+ supported(o,['origin','destination','depDate','journeyType','seatClassName','transportNo','totalDurationHour','sortType','maxPrice','limit','depDateStart','depDateEnd','backDate','backDateStart','backDateEnd','maxDatePairs','depHourStart','depHourEnd','arrHourStart','arrHourEnd']);dates(o);
+ const pairs=planDates(o as TransportOptions);
+ if(!o.destination)throw new PiggyError('INVALID_ARGUMENT','--destination is required.');
+ const jar=new CookieJar();const client=createClient(jar);const result=await searchDatePairs(o as TransportOptions,pairs,fixed=>searchTrainJourney(fixed,client,jar));if(o.limit)result.itemList=result.itemList.slice(0,Number(o.limit));output(result);
 });
 program.command('search-poi').description('Verified popular attractions by city; no dated ticket inventory').requiredOption('--city-name <city>').option('--keyword <text>').option('--poi-level <level>').option('--category <category>').action(async o=>{
  supported(o,['cityName']);output(await searchPoi(o.cityName,createClient(new CookieJar())));
 });
 for(const name of ['search-hotel','search-marriott-hotel']) {
- const cmd=program.command(name).description('BLOCKED: unverified website result interface').requiredOption('--dest-name <destination>').option('--key-words <text>').option('--poi-name <name>').option('--check-in-date <date>').option('--check-out-date <date>').option('--hotel-bed-types <beds>').option('--max-price <cny>').option('--sort <order>');
+ const cmd=program.command(name).description('Verified mainland dated hotel queries; unsupported filters fail explicitly').requiredOption('--dest-name <destination>').option('--key-words <text>').option('--poi-name <name>').option('--check-in-date <date>').option('--check-out-date <date>').option('--hotel-bed-types <beds>').option('--max-price <cny>').option('--sort <order>').option('--page <number>').option('--limit <number>');
  if(name==='search-hotel')cmd.option('--hotel-types <types>').option('--hotel-stars <stars>');else cmd.option('--hotel-brands <brands>').option('--hotel-name <name>');
- cmd.action(()=>blocked(name));
+ cmd.action(async o=>{const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');output(await (name==='search-hotel'?searchHotel(o,client):searchMarriottHotel(o,client)));});
 }
-program.command('search-marriott-package').description('BLOCKED: unverified website result interface').requiredOption('--keyword <text>').option('--sort-type <price_asc|price_desc>').action(()=>blocked('search-marriott-package'));
+program.command('search-marriott-package').description('BLOCKED: unverified website result interface').requiredOption('--keyword <text>').option('--hotel-name <name>').option('--province-or-city <place>').option('--sort-type <price_asc|price_desc>').action(()=>blocked('search-marriott-package'));
 program.command('keyword-search').description('Verified paginated product keyword search').requiredOption('--query <text>').option('--page <number>').option('--limit <number>').action(async o=>{
  const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
  output(await searchKeyword(o,client));
 });
-for(const name of ['ai-search'])program.command(name).description('BLOCKED: unverified website result interface').requiredOption('--query <text>').action(()=>blocked(name));
+for(const name of ['ai-search'])program.command(name).description('Verified mainland dated hotel queries; unsupported filters fail explicitly').requiredOption('--query <text>').action(()=>blocked(name));
 try { await program.parseAsync(); }
 catch(e) {
  if(e instanceof CommanderError && e.exitCode===0)process.exitCode=0;

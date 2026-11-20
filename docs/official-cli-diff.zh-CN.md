@@ -1,6 +1,6 @@
 # open-piggy 与官方 FlyAI CLI 差异
 
-核对日期：2026-11-20。
+核对日期：2026-11-20。本文保留 preview.1 历史基线；后续能力变化见 [preview.2 对齐进度](alignment-progress.zh-CN.md)。
 
 ## 结论
 
