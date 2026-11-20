@@ -4,7 +4,7 @@ import { CookieJar } from 'tough-cookie';
 import { z } from 'zod';
 import { authLogout, authStatus } from './auth.js';
 import {startLogin,waitForLoginReady,readTask,activeId,cancelTask,cancelActive} from './login-task.js';
-import {terminalQr} from './login-qr.js';
+import {shouldWaitForLogin,watchLoginTask} from './login-terminal.js';
 import {browserDoctor,installBrowser} from './browser-runtime.js';
 import { PiggyError, exitCode } from './errors.js';
 import { createClient, loggedIn } from './http.js';
@@ -42,21 +42,25 @@ function dates(o:Record<string,unknown>):void {
 function transport(command:Command):Command {
  return command.requiredOption('--origin <city>').option('--destination <city>').option('--dep-date <date>').option('--dep-date-start <date>').option('--dep-date-end <date>').option('--back-date <date>').option('--back-date-start <date>').option('--back-date-end <date>').option('--journey-type <1|2>').option('--seat-class-name <name>').option('--transport-no <numbers>').option('--transfer-city <city>').option('--dep-hour-start <hour>').option('--dep-hour-end <hour>').option('--arr-hour-start <hour>').option('--arr-hour-end <hour>').option('--total-duration-hour <hours>').option('--max-price <cny>').option('--sort-type <sort>').option('--max-date-pairs <number>','Sequential date-pair request budget (default 49)');
 }
-const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.6').exitOverride().configureOutput({outputError:()=>{}});
+const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.7').exitOverride().configureOutput({outputError:()=>{}});
 program.command('capabilities').description('Show verified capabilities and release blockers').action(()=>output({stableReady:false,capabilities}));
 const browser=program.command('browser').description('Install and diagnose the matching login browser without opening any website');
 browser.command('install').action(async()=>output(await installBrowser()));
 browser.command('doctor').action(async()=>{const report=await browserDoctor();if(report.ready){output(report);return;}console.log(JSON.stringify({status:1,error:report.error,data:report}));process.exitCode=exitCode(report.error?.code??'UPSTREAM_ERROR');});
 const auth=program.command('auth').description('Official QR login; browser is used only here');
-auth.command('login').description('Default: start an independent background QR task, without a visible browser').option('--qr','Return official QR PNG; render on interactive terminals').option('--url','Return a token-protected loopback QR handoff URL for the same task').option('--browser','Run a tracked visible-browser task for manual official verification').action(async o=>{
+auth.command('login').description('Scan official QR in terminals; use --detach for background Agent tasks').option('--qr','Print QR and wait for login in interactive terminals').option('--url','Return a token-protected loopback QR handoff URL for the same task').option('--browser','Run a tracked visible-browser task for manual official verification').option('--wait','Print QR on stderr and wait for authentication, including non-TTY shells').option('--detach','Return task JSON without foreground waiting (Agent mode)').action(async o=>{
  if([o.qr,o.url,o.browser].filter(Boolean).length>1)throw new PiggyError('INVALID_ARGUMENT','Choose only one of --qr, --url or --browser.');
+ const foreground=shouldWaitForLogin(o,Boolean(process.stderr.isTTY));
  if(o.browser)await cancelActive();
- const started=await startLogin(undefined,undefined,o.browser?'browser':'qr');let task=await waitForLoginReady(started.loginId,undefined,15000,o.url||o.browser?'url':'qr');
- if(task.qrPath && !o.url && process.stderr.isTTY){
-  try{const rendered=await terminalQr(task.qrPath);if(rendered)console.error(rendered);}
-  catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;task=await readTask(task.loginId);if(task.state==='pending')throw e;}
- }
+ const started=await startLogin(undefined,undefined,o.browser?'browser':'qr');
+ let task;
+ let interrupted=false;
+ if(foreground){
+  const controller=new AbortController();const onInterrupt=()=>{interrupted=true;controller.abort();};process.once('SIGINT',onInterrupt);
+  try{task=await watchLoginTask(started.loginId,{signal:controller.signal,showUrl:Boolean(o.url)});}finally{process.removeListener('SIGINT',onInterrupt);}
+ }else task=await waitForLoginReady(started.loginId,undefined,15000,o.url||o.browser?'url':'qr');
  const data={...task,statusCommand:`open-piggy auth status --login-id ${task.loginId}`,cancelCommand:`open-piggy auth cancel --login-id ${task.loginId}`,validation:'New browser provider is offline-tested; live acceptance is pending',warnings:['expiresAt is the task deadline, not the official QR expiry; qrExpiresAt is unknown.','QR images and handoff links are transient authentication data; do not publish them.']};
+ if(interrupted){output(data);process.exitCode=130;return;}
  if(task.state==='failed'||task.state==='verification_required'||task.state==='expired'||task.state==='cancelled'){console.log(JSON.stringify({status:1,error:task.error??{code:'LOGIN_REQUIRED',message:'Login task did not authenticate.'},data}));process.exitCode=task.error?.code.startsWith('BROWSER_')?7:task.state==='verification_required'?4:1;return;}
  output(data);
 });

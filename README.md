@@ -8,10 +8,10 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 ## Install
 
-Node.js 22 or later. Download `open-piggy-0.1.0-preview.6.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
+Node.js 22 or later. Download `open-piggy-0.1.0-preview.7.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
 
 ```sh
-npm install -g ./open-piggy-0.1.0-preview.6.tgz
+npm install -g ./open-piggy-0.1.0-preview.7.tgz
 open-piggy capabilities
 ```
 
@@ -38,14 +38,14 @@ Attractions are popular recommendations with **starting prices**, not dated tick
 
 ## Agent-friendly official QR login
 
-**Preview.3 changes the default to a background QR task. The new provider has offline lifecycle tests; actual official widget extraction and end-to-end QR acceptance remain unverified because the current environment blocks the official login URL. No alternate channel was used to bypass that restriction.**
+**Preview.7 displays QR and waits for confirmation in interactive terminals; --detach retains background Agent tasks. The new provider has offline lifecycle tests; actual official widget extraction and end-to-end QR acceptance remain unverified because the current environment blocks the official login URL. No alternate channel was used to bypass that restriction.**
 
 Chromium is still required for login, but QR mode does not open a visible window. In the source checkout:
 
 ```sh
 node dist/cli.js browser install
 node dist/cli.js browser doctor
-node dist/cli.js auth login --qr
+node dist/cli.js auth login --qr --wait
 node dist/cli.js auth status --login-id <returned-loginId>
 node dist/cli.js auth login --url
 node dist/cli.js auth login --browser
@@ -53,7 +53,7 @@ node dist/cli.js auth cancel --login-id <returned-loginId>
 node dist/cli.js auth logout
 ```
 
-`auth login` equals `--qr`. It returns a task ID, private QR PNG path when ready, a token-protected loopback handoff URL, and polling/cancellation commands. An interactive terminal can render the official QR on stderr; stdout stays JSON. The extractor supports login-origin embedded frames, visible img/canvas/container QR candidates and explicitly labeled QR-login mode switches. Candidates must decode as QR before publication. These paths have synthetic fixture tests, not online official-widget acceptance. Missing QR still fails explicitly after30seconds. `--url` hands off the SAME background session rather than pretending a generic login link will return another browser's cookies. `--browser` creates an explicitly visible task for manual official verification.
+`auth login` equals `--qr`. In an interactive terminal it prints the QR on stderr and keeps waiting until the task authenticates or fails; stdout receives one final JSON result. `--wait` forces this flow in redirected/non-TTY shells. Agent callers use `--detach` to return the task ID, private QR PNG path when ready, loopback URL and polling/cancellation commands without foreground waiting. The terminal watcher follows QR files that appear later, rather than exiting at the initial pending result. It renders a changed QR payload once and waits for actual confirmation; stdout stays JSON. The extractor supports login-origin embedded frames, visible img/canvas/container QR candidates and explicitly labeled QR-login mode switches. Candidates must decode as QR before publication. These paths have synthetic fixture tests, not online official-widget acceptance. Missing QR still fails explicitly after30seconds. `--url` hands off the SAME background session rather than pretending a generic login link will return another browser's cookies. `--browser` creates an explicitly visible task for manual official verification.
 
 `auth status --login-id` only reads local state; `auth status` without an ID verifies the saved session with the official HTTP endpoint. A pending task is not a successful login. The five-minute `expiresAt` is the task deadline; the official QR may expire earlier (`qrExpiresAt:null`). New login tasks, QR images and handoff links are private transient authentication data.
 
@@ -159,3 +159,12 @@ Installing the npm CLI installs the Playwright library, not its browser binaries
 Missing browser, system libraries, incompatible runtime and missing graphical display have distinct sanitized errors. QR mode is headless; --browser requires a graphical display. A known terminal login-start failure now returns status1 and a nonzero exit code; polling an existing task remains a successful read whose data.state must be checked.
 
 The real Chromium offline component fixture is `npm run test:login-browser`. It blocks all browser network requests and exercises synthetic iframe/canvas QR, handoff, terminal rendering, synthetic persistence and cleanup. This is not real official login acceptance. Linux deployment findings: [dev2 validation](docs/dev2-validation.zh-CN.md).
+
+## Terminal scan-and-confirm workflow
+
+```sh
+open-piggy browser install
+open-piggy auth login --qr --wait
+```
+
+The first command is normally needed only once per matching browser version. The second prints a readable QR when extraction succeeds, waits for official app confirmation and backend verification, then reports the saved session. It does not treat pending or QR-ready as authentication. Ctrl+C requests cancellation of the task, not logout of a previously saved session. For Agent/task polling use `open-piggy auth login --qr --detach`. The terminal workflow is tested with synthetic existing tasks; real official QR acceptance is still pending in the restricted environment.

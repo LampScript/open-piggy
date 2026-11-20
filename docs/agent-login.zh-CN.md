@@ -1,15 +1,17 @@
-# Agent 友好的扫码登录（preview.3）
+# 终端与 Agent 扫码登录（preview.7）
 
-默认不弹出浏览器窗口。`auth login` 创建后台登录任务，返回二维码文件、本机交接链接和状态查询命令；Agent 可以把二维码交给用户，再轮询任务状态。
+默认不弹出浏览器窗口。交互式终端会显示二维码并等待扫码确认；Agent 使用 `--detach` 创建后台任务、获取二维码文件及状态查询命令。
 
 **验证范围：任务生命周期、终端二维码渲染、本机交接和取消清理已通过离线测试。当前环境禁止访问官方登录 URL，因此没有执行新的无头／有头登录驱动，也没有通过 HTTP、代理或其他通道绕过。二维码组件选择器和完整真实扫码仍待允许访问后的验收。**
 
 ## 命令
 
 ```sh
-# 默认二维码模式：没有可见浏览器窗口
-open-piggy auth login
-open-piggy auth login --qr
+# 终端显示二维码并等待，没有可见浏览器窗口
+open-piggy auth login --qr --wait
+
+# Agent异步任务
+open-piggy auth login --qr --detach
 
 # 同一后台任务的本机二维码交接页；不是另一浏览器的独立官方登录页
 open-piggy auth login --url
@@ -37,7 +39,7 @@ open-piggy auth logout
 
 ## 返回与 Agent 流程
 
-命令仍输出单行 JSON。以下 ID、时间与路径是说明用占位内容，不是真实登录凭证：
+终端等待模式仅在任务结束后输出最终 JSON。以下是 `--detach` 或非交互异步模式的返回示例；ID、时间与路径都是占位内容，不是真实凭证：
 
 ```json
 {
@@ -59,10 +61,10 @@ open-piggy auth logout
 ```
 
 - `pending` 只代表任务存在，不代表登录成功。外层 `status:0` 代表创建／读取任务成功，Agent 必须继续检查 `data.state`。
-- 创建命令最多等待约15秒获取二维码或本机链接，之后返回；不会让 Agent 一直占着前台等用户扫码。
+- `--detach` 创建命令最多等待约15秒获取二维码或本机链接，之后返回。交互式终端／显式 `--wait` 则持续等待至任务终态，不受这个15秒返回窗口影响。
 - 二维码就绪时 `qrPath` 为本机绝对路径。交互式终端会尝试将其解码并在 stderr 渲染二维码，stdout 保持 JSON。Agent 可把 PNG 展示给用户；不得将其发布到公开日志或仓库。
 - `--url` 返回随机 token 保护的 `127.0.0.1` 交接页，页面显示同一后台浏览器会话中的二维码并轮询状态。普通官方登录 URL 无法把另一浏览器的 Cookie 自动交还 CLI，因此不把它冒充可回收会话的 URL 模式。
-- 建议每2秒左右读取一次本地任务状态，直到 `authenticated` 或其他终态。
+- 异步 Agent 建议每2秒左右读取一次本地任务状态，直到 `authenticated` 或其他终态。
 - `expiresAt` 是最长5分钟的**任务期限**，不是官方二维码的保证有效期。`qrExpiresAt:null` 表示二维码自身有效期未知。官方二维码可能更早失效；当前未验证过期覆盖层识别，必要时取消后重建任务。
 
 任务状态：
@@ -118,3 +120,13 @@ open-piggy auth logout
 首次在新账号／新机器上运行前，执行 `open-piggy browser install` 下载与当前CLI匹配的浏览器，再运行 `open-piggy browser doctor`。仅 npm安装CLI不会下载 Chromium。缺少二进制时会返回明确 BROWSER_NOT_INSTALLED，不再用通用 UPSTREAM_ERROR 隐藏直接原因。浏览器安装／系统运行环境问题退出码为7。
 
 自检和真实 Chromium 离线 fixture 均不访问登录网站。真实服务器复现和验证边界见 [dev2-validation.zh-CN.md](dev2-validation.zh-CN.md)。
+
+## preview.7：终端直接打印并等待确认
+
+推荐人工终端使用 `open-piggy auth login --qr --wait`。交互式终端中不传 --wait 也默认等待；即使二维码稍晚出现，前台仍继续追踪，不会因为最初拿到pending就退出。二维码打印到stderr；确认前stdout不提前输出“成功”JSON，任务authenticated后才返回最终结果。提取失败、过期、取消仍有明确终态。
+
+相同payload但PNG视觉字节改变时不重复刷屏；原始payload不进入JSON或日志。Ctrl+C请求取消任务，前台退出码130，既有保存会话不自动注销。
+
+Agent使用 `--detach` 保留异步JSON工作方式；非交互环境默认仍异步，显式 --wait可以在脚本中选择前台等待。--wait与--detach不能同时使用。--url默认继续返回本机交接链接。
+
+新增测试覆盖“最初无二维码、稍后出现、显示后继续等待确认”、PNG变化去重、取消、失败及实际CLI子进程输出时序。CLI测试仅复用合成任务，还指定不存在的浏览器缓存以阻止意外启动真实登录驱动；它没有导航官方登录网站，不能当成真实账号扫码验收。

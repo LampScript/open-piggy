@@ -29,3 +29,4 @@ jobs:
       - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org
       - run: node node_modules/playwright/cli.js install --with-deps chromium
       - run: npm run test:login-browser
+      - run: npm run test:login-terminal

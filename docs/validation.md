@@ -40,3 +40,7 @@ Synthetic fixtures reproduce and verify fixes for rejected login-frame paths and
 ## Preview.6 Linux runtime validation
 
 A user-designated Debian10 x64/Node22.16 server reproduced a missing Playwright1.65.1 browser binary. Installing that dependency's exact Chromium build fixed persistent about:blank startup.104tests/typecheck/build, browser install/doctor and the real Chromium synthetic login component fixture passed on that server. No extra browser flags or system-library upgrades were used. The fixture asserts zero external browser requests; official QR/account authentication remains unverified and was not attempted remotely.
+
+## Preview.7 terminal workflow
+
+The terminal watcher now follows QR readiness through final confirmation. Unit tests cover delayed QR, payload-based redraw deduplication, interactive versus detached modes, cancellation and explicit failures. `npm run test:login-terminal` launches the actual CLI against an already prepared synthetic task, verifies QR block characters on stderr, no premature pending JSON on stdout and one final authenticated-fixture JSON. It never launches a real login provider; the child has an intentionally absent browser cache as a fail-closed guard. The real Chromium offline fixture also exercises the terminal watcher. No official account/QR acceptance is claimed.
