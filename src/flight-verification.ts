@@ -1,8 +1,8 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stderr } from 'node:process';
-import { classifyBrowserLaunchError } from './browser-runtime.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { PiggyError } from './errors.js';
-import { trustedCookie, type Session } from './session.js';
 
 export class FlightVerificationRequired extends PiggyError {
   constructor(readonly pageUrl: string, outcome: 'required' | 'retried' | 'cancelled') {
@@ -14,42 +14,42 @@ export class FlightVerificationRequired extends PiggyError {
 }
 
 export async function withFlightVerification<T>(
-  page: URL, query: (session: Session) => Promise<T>, session: Session,
-  verify?: (page: URL, session: Session) => Promise<Session>
+  page: URL, query: () => Promise<T>,
+  verify?: (page: URL) => Promise<void>
 ): Promise<T> {
-  try { return await query(session); }
+  try { return await query(); }
   catch (error) {
     if (!(error instanceof PiggyError) || error.code !== 'VERIFICATION_REQUIRED') throw error;
     if (!verify) throw new FlightVerificationRequired(page.href, 'required');
   }
-  const verified = await verify(page, session);
-  try { return await query(verified); }
+  await verify(page);
+  try { return await query(); }
   catch (error) {
     if (!(error instanceof PiggyError) || error.code !== 'VERIFICATION_REQUIRED') throw error;
     throw new FlightVerificationRequired(page.href, 'retried');
   }
 }
 
-export async function verifyInBrowser(pageUrl: URL, session: Session): Promise<Session> {
-  stderr.write(`飞猪要求人工验证。正在打开行程页：${pageUrl.href}\n`);
-  const browser = await import('playwright')
-    .then(({chromium}) => chromium.launch({headless:false}))
-    .catch(error => { throw classifyBrowserLaunchError(error); });
+export async function verifyInBrowser(pageUrl: URL): Promise<void> {
+  stderr.write(`请在系统默认浏览器中查看飞猪行程：${pageUrl.href}\n`);
+  const launch = promisify(execFile);
   try {
-    const context = await browser.newContext({storageState:{cookies:session.cookies, origins:[]}});
-    const page = await context.newPage();
-    const controller = new AbortController();
-    page.once('close', () => controller.abort());
-    browser.once('disconnected', () => controller.abort());
-    await page.goto(pageUrl.href, {waitUntil:'commit'});
-    const terminal = createInterface({input:stdin, output:stderr});
-    terminal.once('SIGINT', () => controller.abort());
-    try {
-      await terminal.question('请在浏览器完成验证，确认可以查看行程后按回车重试。关闭窗口或 Ctrl+C 可取消。\n', {signal:controller.signal});
-      return {...session, cookies:(await context.cookies()).filter(c => trustedCookie(c.domain))};
-    } catch (error) {
-      if (controller.signal.aborted) throw new FlightVerificationRequired(pageUrl.href, 'cancelled');
-      throw error;
-    } finally { terminal.close(); }
-  } finally { await browser.close(); }
+    if (process.platform === 'win32') {
+      await launch('rundll32.exe', ['url.dll,FileProtocolHandler', pageUrl.href]);
+    } else {
+      await launch(process.platform === 'darwin' ? 'open' : 'xdg-open', [pageUrl.href]);
+    }
+  } catch {
+    stderr.write('无法自动打开默认浏览器，请手动打开上方链接。\n');
+  }
+  const terminal = createInterface({input:stdin, output:stderr});
+  const controller = new AbortController();
+  terminal.once('SIGINT', () => controller.abort());
+  terminal.once('close', () => controller.abort());
+  try {
+    await terminal.question('完成网页验证后按回车，用 CLI 自己的会话重试一次。Ctrl+C 可取消。\n', {signal:controller.signal});
+  } catch (error) {
+    if (controller.signal.aborted) throw new FlightVerificationRequired(pageUrl.href, 'cancelled');
+    throw error;
+  } finally { terminal.close(); }
 }

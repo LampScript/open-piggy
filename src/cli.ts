@@ -89,23 +89,17 @@ transport(program.command('search-flight').description('Live HTTP flights with d
  if(o.returnFlights && !pairs.some(p=>p.backDate))throw new PiggyError('INVALID_ARGUMENT','--return-flights requires return dates.');
  if(o.journeyType && !['1','2'].includes(o.journeyType))throw new PiggyError('INVALID_ARGUMENT','journey-type must be 1 or 2.');
 
- let session = await loadSession();
- let client = createClient(await jarFromSession(session));
+ const client = createClient(await jarFromSession(await loadSession()));
  let checkedLogin = false;
  output(await searchDatePairs(o as TransportOptions, pairs, async fixed => {
   const flight = fixed as FlightOptions;
-  return withFlightVerification(flightUrl(flight), async current => {
-   if (current !== session) {
-    session = current;
-    client = createClient(await jarFromSession(session));
-    checkedLogin = false;
-   }
+  return withFlightVerification(flightUrl(flight), async () => {
    if (!checkedLogin) {
     if (!await loggedIn(client)) throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
     checkedLogin = true;
    }
    return searchFlight(flight, client);
-  }, session, process.stdin.isTTY && process.stderr.isTTY ? verifyInBrowser : undefined);
+  }, process.stdin.isTTY && process.stderr.isTTY ? verifyInBrowser : undefined);
  }));
 });
 transport(program.command('search-train').description('Verified direct train search; may return future presale schedules')).option('--limit <number>','Limit returned trains after filtering').action(async o=>{

@@ -1,6 +1,6 @@
 # open-piggy 🐷
 
-An independent, open-source CLI for publicly served Fliggy website interfaces. Queries use **HTTP only**. A dedicated browser handles official login and human verification during interactive flight searches. No FlyAI MCP/API key, shared browser cookies, third-party AI model, order creation or payment.
+An independent, open-source CLI for publicly served Fliggy website interfaces. Queries use **HTTP only**. Official login uses a dedicated browser. Interactive flight verification opens the system default browser. No FlyAI MCP/API key, shared browser cookies, third-party AI model, order creation or payment.
 
 **Preview, not a feature-complete replacement for FlyAI.** Seven query categories now have live HTTP evidence: flights, trains, popular attractions, keyword products, mainland hotels, Marriott-brand hotels and dated hotel-package associations. Each has explicit scope limits. AI search remains blocked rather than faked. See [capabilities](docs/compatibility.md) and [endpoint evidence](docs/endpoints.md).
 
@@ -63,7 +63,7 @@ Local state: `~/.config/open-piggy/` (POSIX directory0700, files0600); `OPEN_PIG
 
 ## Flight queries
 
-When Fliggy requests verification during an interactive flight search, the CLI opens the affected itinerary in a visible browser using its own session. Complete the official verification and press Enter in the terminal to retry the affected date pair once. The updated browser session is used in memory for the current command. Closing the window or pressing Ctrl+C at the prompt cancels verification.
+When Fliggy requests verification during an interactive flight search, the CLI opens the affected itinerary in your system default browser. After manual verification, press Enter in the terminal to retry the affected date pair once with the CLI session, or press Ctrl+C to cancel. Browser login and verification state stay in that browser. The website may show prices even if the CLI retry still needs verification.
 
 In unattended runs, the CLI exits with code 4 and includes the official itinerary URL in `error.handoff.url` for manual follow-up. If the retry also requires verification, the same handoff is returned.
 
