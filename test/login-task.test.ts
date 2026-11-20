@@ -78,3 +78,11 @@ test('QR task with no extracted widget fails explicitly instead of staying pendi
  const state=await readTask(task.loginId,dir);assert.equal(state.state,'failed');assert.equal(state.error?.code,'CAPABILITY_UNVERIFIED');assert.match(state.error?.message||'',/QR/);await assert.rejects(loadSession(dir));
  }finally{t.mock.restoreAll();await cleanup(dir);}
 });
+test('browser startup failure does not advertise a dead handoff URL',async()=>{
+ const dir=await home();const task=await startLogin(dir,()=>{});
+ try{await runLoginTask(task.loginId,{start:async()=>{assert.equal((await readTask(task.loginId,dir)).handoffUrl,null);throw Error('synthetic startup failure');},inspect:async()=>({state:'pending'}),close:async()=>{}},dir);const s=await readTask(task.loginId,dir);assert.equal(s.state,'failed');assert.equal(s.handoffUrl,null);}finally{await cleanup(dir);}
+});
+test('handoff never accepts or returns cookies and retains only its own machine session',async()=>{
+ const dir=await home();await saveSession(session,dir);const task=await startLogin(dir,()=>{});const server=await startHandoff(task.loginId,dir);
+ try{const page=await fetch(server.url);assert.equal(page.headers.get('set-cookie'),null);const html=await page.text();assert.ok(!html.includes('fixture-only-private'));const response=await fetch(server.url+'status',{headers:{Cookie:'synthetic-client-cookie=not-imported'}});const body=await response.text();assert.equal(response.headers.get('set-cookie'),null);assert.ok(!body.includes('fixture-only-private'));assert.ok(!body.includes('synthetic-client-cookie'));assert.deepEqual(await loadSession(dir),session);const upload=await fetch(server.url,{method:'POST',body:'cookie=not-accepted'});assert.equal(upload.status,405);assert.deepEqual(await loadSession(dir),session);}finally{await server.close();await cleanup(dir);}
+});

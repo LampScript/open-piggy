@@ -30,3 +30,4 @@ jobs:
       - run: node node_modules/playwright/cli.js install --with-deps chromium
       - run: npm run test:login-browser
       - run: npm run test:login-terminal
+      - run: npm run test:login-url

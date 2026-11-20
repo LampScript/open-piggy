@@ -14,9 +14,10 @@ export async function runLoginTask(id:string,driver:LoginDriver,home=sessionDire
   if(task.state!=='pending')return;
   task={...task,workerPid:process.pid};await writeTask(task,home);
   if(await cancelled(id,home)||await activeId(home)!==id){task={...task,state:'cancelled'};return;}
-  handoff=await startHandoff(id,home);task={...task,handoffUrl:handoff.url};await writeTask(task,home);
   task={...task,phase:'opening_login'};await writeTask(task,home);
-  await driver.start();let qrHash='';const qrDeadline=Date.now()+30000;
+  await driver.start();
+  handoff=await startHandoff(id,home);task={...task,handoffUrl:handoff.url};await writeTask(task,home);
+  let qrHash='';const qrDeadline=Date.now()+30000;
   task={...task,phase:task.mode==='qr'?'waiting_for_qr':'waiting_for_user'};await writeTask(task,home);
   while(Date.now()<Date.parse(task.expiresAt)){
    if(await cancelled(id,home)||await activeId(home)!==id){task={...task,state:'cancelled'};break;}

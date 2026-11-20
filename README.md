@@ -8,10 +8,10 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 ## Install
 
-Node.js 22 or later. Download `open-piggy-0.1.0-preview.7.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
+Node.js 22 or later. Download `open-piggy-0.1.0-preview.8.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
 
 ```sh
-npm install -g ./open-piggy-0.1.0-preview.7.tgz
+npm install -g ./open-piggy-0.1.0-preview.8.tgz
 open-piggy capabilities
 ```
 
@@ -168,3 +168,14 @@ open-piggy auth login --qr --wait
 ```
 
 The first command is normally needed only once per matching browser version. The second prints a readable QR when extraction succeeds, waits for official app confirmation and backend verification, then reports the saved session. It does not treat pending or QR-ready as authentication. Ctrl+C requests cancellation of the task, not logout of a previously saved session. For Agent/task polling use `open-piggy auth login --qr --detach`. The terminal workflow is tested with synthetic existing tasks; real official QR acceptance is still pending in the restricted environment.
+
+## Same-host URL login handoff (no cookie transfer)
+
+```sh
+open-piggy auth login --url
+open-piggy auth login --url --plain
+```
+
+The first command prints the private loopback link on stderr and task JSON on stdout. With --plain, stdout contains one URL only, suitable for shell capture; it does not mean authenticated. The same machine's background Chromium owns the official session. The handoff page only displays QR/status, never imports/exports cookies or accepts session uploads. Startup must succeed before a handoff URL is advertised; missing browser setup fails explicitly.
+
+This covers servers without a graphical desktop, not servers without any browser engine. A generic official login URL in another browser cannot automatically authenticate this CLI. No cookie migration/local-to-server session import is implemented. The link is short-lived sensitive authentication data and stays on127.0.0.1; remote access requires your own controlled SSH forwarding, not a hosted relay or public listener. URL display still depends on the same official QR extraction; it is not a separate authentication mechanism. Real official login acceptance remains unverified in the restricted environment.

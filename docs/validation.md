@@ -44,3 +44,7 @@ A user-designated Debian10 x64/Node22.16 server reproduced a missing Playwright1
 ## Preview.7 terminal workflow
 
 The terminal watcher now follows QR readiness through final confirmation. Unit tests cover delayed QR, payload-based redraw deduplication, interactive versus detached modes, cancellation and explicit failures. `npm run test:login-terminal` launches the actual CLI against an already prepared synthetic task, verifies QR block characters on stderr, no premature pending JSON on stdout and one final authenticated-fixture JSON. It never launches a real login provider; the child has an intentionally absent browser cache as a fail-closed guard. The real Chromium offline fixture also exercises the terminal watcher. No official account/QR acceptance is claimed.
+
+## Preview.8 URL handoff
+
+The real CLI subprocess fixture reuses a synthetic same-host login task and verifies one plain loopback URL, pending-not-authenticated at handoff, QR/status availability, no returned/imported cookies and same-host synthetic persistence after confirmation. Unit tests ensure no URL is advertised before browser startup, incoming Cookie headers are not imported, no Set-Cookie is returned and upload POSTs are rejected. This is local fixture evidence only; official QR login remains unverified.

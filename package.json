@@ -1,6 +1,6 @@
 {
   "name": "open-piggy",
-  "version": "0.1.0-preview.7",
+  "version": "0.1.0-preview.8",
   "description": "Independent Fliggy web HTTP CLI — capability-verified preview",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,8 @@
     "prepack": "npm run build",
     "check": "npm run typecheck && npm test && npm run build",
     "test:login-browser": "npm run build && node --import tsx scripts/test-login-browser.mjs",
-    "test:login-terminal": "npm run build && node --import tsx scripts/test-terminal-login.mjs"
+    "test:login-terminal": "npm run build && node --import tsx scripts/test-terminal-login.mjs",
+    "test:login-url": "npm run build && node --import tsx scripts/test-url-login.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

@@ -42,14 +42,17 @@ function dates(o:Record<string,unknown>):void {
 function transport(command:Command):Command {
  return command.requiredOption('--origin <city>').option('--destination <city>').option('--dep-date <date>').option('--dep-date-start <date>').option('--dep-date-end <date>').option('--back-date <date>').option('--back-date-start <date>').option('--back-date-end <date>').option('--journey-type <1|2>').option('--seat-class-name <name>').option('--transport-no <numbers>').option('--transfer-city <city>').option('--dep-hour-start <hour>').option('--dep-hour-end <hour>').option('--arr-hour-start <hour>').option('--arr-hour-end <hour>').option('--total-duration-hour <hours>').option('--max-price <cny>').option('--sort-type <sort>').option('--max-date-pairs <number>','Sequential date-pair request budget (default 49)');
 }
-const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.7').exitOverride().configureOutput({outputError:()=>{}});
+let plainAuthUrl=false;
+const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.8').exitOverride().configureOutput({outputError:()=>{}});
 program.command('capabilities').description('Show verified capabilities and release blockers').action(()=>output({stableReady:false,capabilities}));
 const browser=program.command('browser').description('Install and diagnose the matching login browser without opening any website');
 browser.command('install').action(async()=>output(await installBrowser()));
 browser.command('doctor').action(async()=>{const report=await browserDoctor();if(report.ready){output(report);return;}console.log(JSON.stringify({status:1,error:report.error,data:report}));process.exitCode=exitCode(report.error?.code??'UPSTREAM_ERROR');});
 const auth=program.command('auth').description('Official QR login; browser is used only here');
-auth.command('login').description('Scan official QR in terminals; use --detach for background Agent tasks').option('--qr','Print QR and wait for login in interactive terminals').option('--url','Return a token-protected loopback QR handoff URL for the same task').option('--browser','Run a tracked visible-browser task for manual official verification').option('--wait','Print QR on stderr and wait for authentication, including non-TTY shells').option('--detach','Return task JSON without foreground waiting (Agent mode)').action(async o=>{
+auth.command('login').description('Scan official QR in terminals; use --detach for background Agent tasks').option('--qr','Print QR and wait for login in interactive terminals').option('--url','Print the same-host private QR handoff URL; does not transfer cookies').option('--plain','With --url: print only the handoff URL on stdout (no JSON)').option('--browser','Run a tracked visible-browser task for manual official verification').option('--wait','Print QR on stderr and wait for authentication, including non-TTY shells').option('--detach','Return task JSON without foreground waiting (Agent mode)').action(async o=>{
+ plainAuthUrl=Boolean(o.plain);
  if([o.qr,o.url,o.browser].filter(Boolean).length>1)throw new PiggyError('INVALID_ARGUMENT','Choose only one of --qr, --url or --browser.');
+ if(o.plain&&(!o.url||o.wait))throw new PiggyError('INVALID_ARGUMENT','--plain requires --url and cannot be combined with --wait.');
  const foreground=shouldWaitForLogin(o,Boolean(process.stderr.isTTY));
  if(o.browser)await cancelActive();
  const started=await startLogin(undefined,undefined,o.browser?'browser':'qr');
@@ -58,10 +61,16 @@ auth.command('login').description('Scan official QR in terminals; use --detach f
  if(foreground){
   const controller=new AbortController();const onInterrupt=()=>{interrupted=true;controller.abort();};process.once('SIGINT',onInterrupt);
   try{task=await watchLoginTask(started.loginId,{signal:controller.signal,showUrl:Boolean(o.url)});}finally{process.removeListener('SIGINT',onInterrupt);}
- }else task=await waitForLoginReady(started.loginId,undefined,15000,o.url||o.browser?'url':'qr');
+ }else task=await waitForLoginReady(started.loginId,undefined,o.url?60000:15000,o.url||o.browser?'url':'qr');
  const data={...task,statusCommand:`open-piggy auth status --login-id ${task.loginId}`,cancelCommand:`open-piggy auth cancel --login-id ${task.loginId}`,validation:'New browser provider is offline-tested; live acceptance is pending',warnings:['expiresAt is the task deadline, not the official QR expiry; qrExpiresAt is unknown.','QR images and handoff links are transient authentication data; do not publish them.']};
  if(interrupted){output(data);process.exitCode=130;return;}
- if(task.state==='failed'||task.state==='verification_required'||task.state==='expired'||task.state==='cancelled'){console.log(JSON.stringify({status:1,error:task.error??{code:'LOGIN_REQUIRED',message:'Login task did not authenticate.'},data}));process.exitCode=task.error?.code.startsWith('BROWSER_')?7:task.state==='verification_required'?4:1;return;}
+ if(task.state==='failed'||task.state==='verification_required'||task.state==='expired'||task.state==='cancelled'){if(o.plain)console.error(task.error?.message??'Login task did not authenticate.');else console.log(JSON.stringify({status:1,error:task.error??{code:'LOGIN_REQUIRED',message:'Login task did not authenticate.'},data}));process.exitCode=task.error?.code.startsWith('BROWSER_')?7:task.state==='verification_required'?4:1;return;}
+ if(o.url&&!foreground&&task.state==='pending'){
+  if(!task.handoffUrl)throw new PiggyError('UPSTREAM_ERROR','The same-host browser login handoff is not ready; no usable login URL was produced.');
+  if(o.plain){console.log(task.handoffUrl);return;}
+  console.error(`Private same-host login URL: ${task.handoffUrl}`);
+ }
+ if(o.plain){console.error('Login already completed; no handoff URL is needed.');return;}
  output(data);
 });
 auth.command('status').option('--login-id <id>','Read a login task without browser or network').option('--pending','Read the active login task').action(async o=>{
@@ -107,6 +116,6 @@ catch(e) {
  if(e instanceof CommanderError && e.exitCode===0)process.exitCode=0;
  else {
   const error=e instanceof PiggyError?e:e instanceof CommanderError?new PiggyError('INVALID_ARGUMENT',e.message):new PiggyError('UPSTREAM_ERROR','Unexpected error; no response or credentials have been logged.');
-  console.error(error.message);console.log(JSON.stringify({status:1,error:{code:error.code,message:error.message}}));process.exitCode=exitCode(error.code);
+  console.error(error.message);if(!plainAuthUrl)console.log(JSON.stringify({status:1,error:{code:error.code,message:error.message}}));process.exitCode=exitCode(error.code);
  }
 }
