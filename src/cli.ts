@@ -2,7 +2,9 @@
 import { Command, CommanderError } from 'commander';
 import { CookieJar } from 'tough-cookie';
 import { z } from 'zod';
-import { authLogin, authLogout, authStatus } from './auth.js';
+import { authLogout, authStatus } from './auth.js';
+import {startLogin,waitForLoginReady,readTask,activeId,cancelTask,cancelActive} from './login-task.js';
+import {terminalQr} from './login-qr.js';
 import { PiggyError, exitCode } from './errors.js';
 import { createClient, loggedIn } from './http.js';
 import { jarFromSession, loadSession } from './session.js';
@@ -39,10 +41,27 @@ function dates(o:Record<string,unknown>):void {
 function transport(command:Command):Command {
  return command.requiredOption('--origin <city>').option('--destination <city>').option('--dep-date <date>').option('--dep-date-start <date>').option('--dep-date-end <date>').option('--back-date <date>').option('--back-date-start <date>').option('--back-date-end <date>').option('--journey-type <1|2>').option('--seat-class-name <name>').option('--transport-no <numbers>').option('--transfer-city <city>').option('--dep-hour-start <hour>').option('--dep-hour-end <hour>').option('--arr-hour-start <hour>').option('--arr-hour-end <hour>').option('--total-duration-hour <hours>').option('--max-price <cny>').option('--sort-type <sort>').option('--max-date-pairs <number>','Sequential date-pair request budget (default 49)');
 }
-const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.2').exitOverride().configureOutput({outputError:()=>{}});
+const program=new Command().name('open-piggy').description('Independent Fliggy website HTTP CLI — preview; run capabilities for honest coverage.').version('0.1.0-preview.3').exitOverride().configureOutput({outputError:()=>{}});
 program.command('capabilities').description('Show verified capabilities and release blockers').action(()=>output({stableReady:false,capabilities}));
 const auth=program.command('auth').description('Official QR login; browser is used only here');
-auth.command('login').action(async()=>output(await authLogin()));auth.command('status').action(async()=>output(await authStatus()));auth.command('logout').action(async()=>output(await authLogout()));
+auth.command('login').description('Default: start an independent background QR task, without a visible browser').option('--qr','Return official QR PNG; render on interactive terminals').option('--url','Return a token-protected loopback QR handoff URL for the same task').option('--browser','Run a tracked visible-browser task for manual official verification').action(async o=>{
+ if([o.qr,o.url,o.browser].filter(Boolean).length>1)throw new PiggyError('INVALID_ARGUMENT','Choose only one of --qr, --url or --browser.');
+ if(o.browser)await cancelActive();
+ const started=await startLogin(undefined,undefined,o.browser?'browser':'qr');let task=await waitForLoginReady(started.loginId,undefined,15000,o.url||o.browser?'url':'qr');
+ if(task.qrPath && !o.url && process.stderr.isTTY){
+  try{const rendered=await terminalQr(task.qrPath);if(rendered)console.error(rendered);}
+  catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;task=await readTask(task.loginId);if(task.state==='pending')throw e;}
+ }
+ output({...task,statusCommand:`open-piggy auth status --login-id ${task.loginId}`,cancelCommand:`open-piggy auth cancel --login-id ${task.loginId}`,validation:'New browser provider is offline-tested; live acceptance is pending',warnings:['expiresAt is the task deadline, not the official QR expiry; qrExpiresAt is unknown.','QR images and handoff links are transient authentication data; do not publish them.']});
+});
+auth.command('status').option('--login-id <id>','Read a login task without browser or network').option('--pending','Read the active login task').action(async o=>{
+ if(o.loginId&&o.pending)throw new PiggyError('INVALID_ARGUMENT','Use either login-id or pending.');
+ if(o.loginId){output(await readTask(o.loginId));return;}
+ if(o.pending){const id=await activeId();output(id?await readTask(id):{state:'idle'});return;}
+ output(await authStatus());
+});
+auth.command('cancel').requiredOption('--login-id <id>').action(async o=>output(await cancelTask(o.loginId)));
+auth.command('logout').action(async()=>output(await authLogout()));
 transport(program.command('search-flight').description('Live HTTP flights with date ranges, journey filters and exact segment sequences')).option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--experimental','Compatibility flag; fixed-date HTTP flight transport has passed live acceptance').option('--outbound-flights <numbers>','Exact outbound segment sequence').option('--return-flights <numbers>','Exact return segment sequence').action(async o=>{
  supported(o,['origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental','depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs','transferCity','depHourStart','depHourEnd','arrHourStart','arrHourEnd','outboundFlights','returnFlights']);dates(o);
  const pairs=planDates(o as TransportOptions);

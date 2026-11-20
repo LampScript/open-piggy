@@ -100,3 +100,7 @@ Sources: [package reference](https://github.com/alibaba-flyai/flyai-skill/blob/7
 - Official flight examples use `adultPrice`, while reported live output uses `ticketPrice`; examples are not a reliable wire schema. [Issue #65](https://github.com/alibaba-flyai/flyai-skill/issues/65).
 - The upstream ten-result policy was confirmed by a maintainer; date-range search is a selection of candidates rather than exhaustive coverage. [Issue #54](https://github.com/alibaba-flyai/flyai-skill/issues/54).
 - `status: 1` with process exit 0 has been reported for routes for which the website has results. Open-piggy must distinguish transport success from business success. [Issue #74](https://github.com/alibaba-flyai/flyai-skill/issues/74).
+
+## Preview.3 authentication interface
+
+Default auth login now returns a background QR task; --url hands off the same task through a private loopback page, and --browser is an explicitly visible tracked task. Poll auth status --login-id, rather than interpreting task creation as authentication. Detailed state/cleanup semantics and the explicit pending online acceptance limitation are in [agent-login.zh-CN.md](agent-login.zh-CN.md). Queries remain HTTP-only.

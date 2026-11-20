@@ -8,10 +8,10 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 ## Install
 
-Node.js 22 or later. Download `open-piggy-0.1.0-preview.2.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
+Node.js 22 or later. Download `open-piggy-0.1.0-preview.3.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
 
 ```sh
-npm install -g ./open-piggy-0.1.0-preview.2.tgz
+npm install -g ./open-piggy-0.1.0-preview.3.tgz
 open-piggy capabilities
 ```
 
@@ -36,23 +36,29 @@ open-piggy search-train --origin 上海 --destination 北京 --dep-date 2027-02-
 
 Attractions are popular recommendations with **starting prices**, not dated ticket inventory. Train schedules can be outside the ticket sales window: `bookable: false` means they are not currently purchasable; do not treat a scheduled train and a reference fare as available inventory.
 
-## Official QR login
+## Agent-friendly official QR login
 
-Chromium is only needed for login. In the source checkout:
+**Preview.3 changes the default to a background QR task. The new provider has offline lifecycle tests; actual official widget extraction and end-to-end QR acceptance remain unverified because the current environment blocks the official login URL. No alternate channel was used to bypass that restriction.**
+
+Chromium is still required for login, but QR mode does not open a visible window. In the source checkout:
 
 ```sh
 npx playwright install chromium
-node dist/cli.js auth login
-node dist/cli.js auth status
-node dist/cli.js keyword-search --query 上海 --limit 3
+node dist/cli.js auth login --qr
+node dist/cli.js auth status --login-id <returned-loginId>
+node dist/cli.js auth login --url
+node dist/cli.js auth login --browser
+node dist/cli.js auth cancel --login-id <returned-loginId>
 node dist/cli.js auth logout
 ```
 
-For a global install, install Chromium using the Playwright version installed with open-piggy (see `npm ls -g playwright`); `npx --package playwright@<that-version> playwright install chromium` downloads the matching browser.
+`auth login` equals `--qr`. It returns a task ID, private QR PNG path when ready, a token-protected loopback handoff URL, and polling/cancellation commands. An interactive terminal can render the official QR on stderr; stdout stays JSON. `--url` hands off the SAME background session rather than pretending a generic login link will return another browser's cookies. `--browser` creates an explicitly visible task for manual official verification.
 
-`auth login` opens Taobao's official login page and asks you to scan the official QR code. Complete verification yourself. After the official redirect to Fliggy, the CLI checks the official login-status endpoint, exports only its **own** browser context's official-site cookies, and verifies that they work with pure HTTP before saving. It closes and deletes its temporary browser profile afterward. It never reads your existing Chrome profile. Browser closure, timeout or failed HTTP verification does not save a new session.
+`auth status --login-id` only reads local state; `auth status` without an ID verifies the saved session with the official HTTP endpoint. A pending task is not a successful login. The five-minute `expiresAt` is the task deadline; the official QR may expire earlier (`qrExpiresAt:null`). New login tasks, QR images and handoff links are private transient authentication data.
 
-Local state is `~/.config/open-piggy/session.json` (directory `0700`, file `0600` on POSIX). `OPEN_PIGGY_HOME` overrides this directory. `auth logout` removes this local session only; it does not log out other official browser sessions. Cookie-based access is sensitive: never commit or share this directory. Windows users should protect it with a private user-directory ACL.
+Only the tool's own official-browser session is saved, after HTTP verification. The existing Chrome profile is never read. Logout cancels and waits for pending task persistence before removing the local session. Finished tasks close their browser/loopback server and remove QR/profile artifacts.
+
+Local state: `~/.config/open-piggy/` (POSIX directory0700, files0600); `OPEN_PIGGY_HOME` overrides it. Windows users should protect the directory with a private ACL. A global install needs the matching Playwright Chromium; see `npm ls -g playwright` and install that Playwright version's Chromium. Detailed commands, state semantics, limitations and remote-loopback guidance: [Agent login](docs/agent-login.zh-CN.md).
 
 ## Flight queries
 
