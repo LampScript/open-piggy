@@ -26,3 +26,5 @@ Flight baggage/fare conditions and GDS fares, train transfers and full provider 
 - New regression coverage: date-pair budgets before large Cartesian allocation, failed-pair propagation, chronology of independent return tickets, all transport sort modes, exact flight sequence and preselected return-link type, local hour windows, and hotel city/brand/date response integrity.
 
 - Preview.2 live flight acceptance queried both 2027-02-04 and 02-05 with a fixed 02-12 return, exact AC segment sequences, 温哥华 transfer filter, economy, strict duration<20h, departure-hour filter and duration sorting. Both requested date pairs completed; only the 02-04 combination matched the exact constraints. A non-match is not a claim that the other day has no inventory.
+
+- Dated Marriott package association query (上海,2026-12-01..02, official 万豪 facet) succeeded over own-session HTTP and returned actual item IDs with displays780/晚 and1199/晚. Plain display retained; no total/tax/availability inference. Preview.2 final local suite:66tests.

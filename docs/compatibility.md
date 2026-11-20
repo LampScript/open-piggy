@@ -13,7 +13,7 @@ Reviewed on 2026-11-20 against the official [FlyAI skill repository](https://git
 | `search-hotel` | `--dest-name` | Partial: mainland dated queries, price sorting, city resolution, page and keyword verified |
 | `search-poi` | `--city-name` | Partial: city popular recommendations verified, not full POI filtering |
 | `search-marriott-hotel` | `--dest-name` | Partial: mainland official brand-facet filtering verified; not full global portfolio |
-| `search-marriott-package` | `--keyword` | Not yet verified |
+| `search-marriott-package` | `--keyword` | Partial: dated package associations for verified mainland Marriott hotels; explicit dates/city required |
 | `keyword-search` | `--query` | Partial: own-session HTTP product search and website pagination verified; starting prices only |
 | `ai-search` | `--query` | Not yet verified |
 

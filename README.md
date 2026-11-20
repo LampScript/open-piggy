@@ -2,7 +2,7 @@
 
 An independent, open-source CLI for publicly served Fliggy website interfaces. Queries use **HTTP only**. A browser is used only for official QR login and redirects, with a dedicated local session. No FlyAI MCP/API key, shared browser cookies, third-party AI model, order creation or payment.
 
-**Preview, not a feature-complete replacement for FlyAI.** Six query categories now have live HTTP evidence: flights, trains, popular attractions, keyword products, mainland hotels and Marriott-brand hotels. Each still has explicit scope limits. Marriott packages and AI search remain blocked rather than faked. See [capabilities](docs/compatibility.md) and [endpoint evidence](docs/endpoints.md).
+**Preview, not a feature-complete replacement for FlyAI.** Seven query categories now have live HTTP evidence: flights, trains, popular attractions, keyword products, mainland hotels, Marriott-brand hotels and dated hotel-package associations. Each has explicit scope limits. AI search remains blocked rather than faked. See [capabilities](docs/compatibility.md) and [endpoint evidence](docs/endpoints.md).
 
 最新中文进度：[preview.2 对齐情况](docs/alignment-progress.zh-CN.md)。首版详细对比：[preview.1 与官方 CLI 的差异](docs/official-cli-diff.zh-CN.md)。
 
@@ -88,6 +88,15 @@ open-piggy search-marriott-hotel --dest-name 上海 --check-in-date 2026-12-01 -
 
 Destination resolution, stay dates, official page/price sorting, keywords, and local max-price filtering are supported for mainland destinations. Marriott filters use dynamically resolved official brand facets, not title matching or hardcoded brand IDs. Read [hotel evidence](docs/hotel-evidence.md) for the verified brand labels and actual occupancy. Taxes, bookability and nightly-versus-stay-total basis are unknown. Max-price filters one requested page only. Overseas, POI, hotel type, star, bed and rating/distance sort filters remain explicit unsupported capabilities.
 
+## Marriott hotel-package associations
+
+```sh
+open-piggy search-marriott-package --keyword 上海 --hotel-brands 万豪 \
+  --check-in-date 2026-12-01 --check-out-date 2026-12-02 --sort-type price_asc --limit 3
+```
+
+This preview requires explicit stay dates and a mainland city keyword (or `--province-or-city` as an explicit city with a hotel keyword). It looks up packages for one page of actual officially brand-filtered hotels. It does not implement the official CLI's arbitrary keyword/global catalogue semantics. Original `displayPrice` is retained; only a positive numeric `/晚` display is parsed as a per-night starting price. Tax, inclusions and actual bookability are unknown. See [package evidence](docs/package-evidence.md).
+
 ## Command status
 
 | Command | This preview |
@@ -97,7 +106,7 @@ Destination resolution, stay dates, official page/price sorting, keywords, and l
 | `search-poi` | Partial: verified popular attractions by city |
 | `search-hotel` | Partial: mainland dated hotel queries and limited filters |
 | `search-marriott-hotel` | Partial: mainland hotels using verified official Marriott brand facets |
-| `search-marriott-package` | Blocked: result API unverified |
+| `search-marriott-package` | Partial: dated package associations for official Marriott-brand mainland hotels; not full catalogue |
 | `keyword-search` | Partial: live paginated product keyword search; starting prices only |
 | `ai-search` | Blocked: corresponding website capability unverified |
 

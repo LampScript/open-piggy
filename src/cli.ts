@@ -10,6 +10,7 @@ import { searchFlight, type FlightOptions } from './flight.js';
 import { searchPoi } from './poi.js';
 import { searchKeyword } from './keyword.js';
 import { searchHotel,searchMarriottHotel } from './hotel.js';
+import { searchMarriottPackage } from './marriott-package.js';
 import { searchTrainJourney } from './train-query.js';
 import {planDates,searchDatePairs,type TransportOptions} from './transport.js';
 export const capabilities = [
@@ -19,7 +20,8 @@ export const capabilities = [
  {command:'keyword-search',status:'partial',evidence:'Live own-session HTTP product search with explicit website pagination; starting prices only.'},
  {command:'search-hotel',status:'partial',evidence:'Mainland dated hotel results, actual city resolution, price sorting and pagination verified.'},
  {command:'search-marriott-hotel',status:'partial',evidence:'Marriott portfolio filters use dynamically resolved official brand facets; mainland destinations only.'},
- ...['search-marriott-package','ai-search'].map(command=>({command,status:'blocked',evidence:'No corresponding pure-HTTP result query has been verified. See docs/endpoints.md.'}))
+ {command:'search-marriott-package',status:'partial',evidence:'Dated package associations for officially brand-filtered mainland hotels; not global or arbitrary-keyword catalogue parity.'},
+ ...['ai-search'].map(command=>({command,status:'blocked',evidence:'No corresponding pure-HTTP result query has been verified. See docs/endpoints.md.'}))
 ];
 function output(data: unknown) { console.log(JSON.stringify({status:0,message:'success',data})); }
 function blocked(command:string):never { throw new PiggyError('CAPABILITY_UNVERIFIED',`${command} is not implemented: no verified website HTTP result contract. This preview is not feature-aligned with FlyAI.`); }
@@ -65,7 +67,7 @@ for(const name of ['search-hotel','search-marriott-hotel']) {
  if(name==='search-hotel')cmd.option('--hotel-types <types>').option('--hotel-stars <stars>');else cmd.option('--hotel-brands <brands>').option('--hotel-name <name>');
  cmd.action(async o=>{const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');output(await (name==='search-hotel'?searchHotel(o,client):searchMarriottHotel(o,client)));});
 }
-program.command('search-marriott-package').description('BLOCKED: unverified website result interface').requiredOption('--keyword <text>').option('--hotel-name <name>').option('--province-or-city <place>').option('--sort-type <price_asc|price_desc>').action(()=>blocked('search-marriott-package'));
+program.command('search-marriott-package').description('Dated package associations for verified mainland Marriott hotels').requiredOption('--keyword <text>').option('--hotel-name <name>').option('--province-or-city <place>').option('--hotel-brands <brands>').option('--check-in-date <date>').option('--check-out-date <date>').option('--page <number>').option('--limit <number>').option('--sort-type <price_asc|price_desc>').action(async o=>{const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');output(await searchMarriottPackage(o,client));});
 program.command('keyword-search').description('Verified paginated product keyword search').requiredOption('--query <text>').option('--page <number>').option('--limit <number>').action(async o=>{
  const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
  output(await searchKeyword(o,client));
