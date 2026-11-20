@@ -4,6 +4,8 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 **Preview, not a feature-complete replacement for FlyAI.** Limited train and attraction searches have live HTTP evidence; fixed-date flights now also pass own-session HTTP acceptance, with incomplete filters and fare rules. Four command categories are explicitly blocked rather than faked. See [capabilities](docs/compatibility.md) and [endpoint evidence](docs/endpoints.md).
 
+完整中文对比：[与官方 FlyAI CLI 的功能及参数差异](docs/official-cli-diff.zh-CN.md)。
+
 ## Install
 
 Node.js 22 or later. Download `open-piggy-0.1.0-preview.1.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
