@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tgz
+.env
+.env.*
+*.har
+*.saz
+playwright-report/
+test-results/
+.DS_Store
