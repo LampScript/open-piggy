@@ -112,3 +112,9 @@ open-piggy auth logout
 离线测试复现了原路径限制拒绝嵌套登录文档、原选择器不匹配 canvas 的缺陷；另测了隐藏首节点、不可解码 logo、背景容器及明确模式切换。全部 frame 和 PNG 均为合成 fixture，没有访问受限的官方登录页面。
 
 这证明上述代码缺陷已修正，不能证明当前官网具体使用哪种结构，也不能据此断言用户之前失败的具体原因已唯一定位。真实扫码验收仍待完成。
+
+## preview.6：服务器首次安装与自检
+
+首次在新账号／新机器上运行前，执行 `open-piggy browser install` 下载与当前CLI匹配的浏览器，再运行 `open-piggy browser doctor`。仅 npm安装CLI不会下载 Chromium。缺少二进制时会返回明确 BROWSER_NOT_INSTALLED，不再用通用 UPSTREAM_ERROR 隐藏直接原因。浏览器安装／系统运行环境问题退出码为7。
+
+自检和真实 Chromium 离线 fixture 均不访问登录网站。真实服务器复现和验证边界见 [dev2-validation.zh-CN.md](dev2-validation.zh-CN.md)。

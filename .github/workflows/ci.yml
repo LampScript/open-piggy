@@ -18,3 +18,14 @@ jobs:
       - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org
       - run: npm run check
       - run: npm pack --dry-run
+  login-browser-fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --registry=https://registry.npmjs.org
+      - run: node node_modules/playwright/cli.js install --with-deps chromium
+      - run: npm run test:login-browser

@@ -36,3 +36,7 @@ Default QR and URL login use a detached task with a private loopback handoff; ex
 ## Preview.5 QR extraction checks
 
 Synthetic fixtures reproduce and verify fixes for rejected login-frame paths and missing canvas matching. Additional cases cover hidden first matches, decorative images, valid container QR images, nonofficial origins/ports and explicitly labeled QR-mode controls. This validates extraction code offline; it is not live official QR authentication acceptance.
+
+## Preview.6 Linux runtime validation
+
+A user-designated Debian10 x64/Node22.16 server reproduced a missing Playwright1.65.1 browser binary. Installing that dependency's exact Chromium build fixed persistent about:blank startup.104tests/typecheck/build, browser install/doctor and the real Chromium synthetic login component fixture passed on that server. No extra browser flags or system-library upgrades were used. The fixture asserts zero external browser requests; official QR/account authentication remains unverified and was not attempted remotely.

@@ -5,6 +5,7 @@ import {createClient,loggedIn,parseJsonResponse} from './http.js';
 import {jarFromSession,trustedCookie,type Session} from './session.js';
 import {PiggyError} from './errors.js';
 import {hasDecodableQr} from './login-qr.js';
+import {classifyBrowserLaunchError} from './browser-runtime.js';
 export type LoginInspection={state:'pending';qr?:Buffer}|{state:'authenticated';session:Session}|{state:'verification_required'};
 export interface LoginDriver {start():Promise<void>;inspect():Promise<LoginInspection>;close():Promise<void>;}
 // This provider is NOT live-accepted in the current restricted environment.
@@ -52,8 +53,8 @@ export function browserQrDriver(profile:string,visible=false):LoginDriver {
   async start(){
    await mkdir(profile,{recursive:true,mode:0o700});
    let chromium;
-   try {({chromium}=await import('playwright'));}catch{throw new PiggyError('CAPABILITY_UNVERIFIED','QR login requires Playwright and its matching Chromium installation.');}
-   try {context=await chromium.launchPersistentContext(profile,{headless:!visible});}catch{throw new PiggyError('UPSTREAM_ERROR','Cannot launch login browser; install matching Playwright Chromium.');}
+   try {({chromium}=await import('playwright'));}catch(error){throw classifyBrowserLaunchError(error);}
+   try {context=await chromium.launchPersistentContext(profile,{headless:!visible});}catch(error){throw classifyBrowserLaunchError(error);}
    page=context.pages()[0]||await context.newPage();
    const url=new URL('https://login.taobao.com/member/login.jhtml');url.searchParams.set('redirectURL','https://www.fliggy.com/');
    try {await page.goto(url.href,{waitUntil:'domcontentloaded',timeout:30000});}catch{throw new PiggyError('NETWORK_ERROR','Official login page could not be loaded.');}

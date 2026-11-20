@@ -8,10 +8,10 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 ## Install
 
-Node.js 22 or later. Download `open-piggy-0.1.0-preview.5.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
+Node.js 22 or later. Download `open-piggy-0.1.0-preview.6.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
 
 ```sh
-npm install -g ./open-piggy-0.1.0-preview.5.tgz
+npm install -g ./open-piggy-0.1.0-preview.6.tgz
 open-piggy capabilities
 ```
 
@@ -43,7 +43,8 @@ Attractions are popular recommendations with **starting prices**, not dated tick
 Chromium is still required for login, but QR mode does not open a visible window. In the source checkout:
 
 ```sh
-npx playwright install chromium
+node dist/cli.js browser install
+node dist/cli.js browser doctor
 node dist/cli.js auth login --qr
 node dist/cli.js auth status --login-id <returned-loginId>
 node dist/cli.js auth login --url
@@ -132,6 +133,7 @@ Failure: one JSON line with `status: 1` and `error.code/message`; human-readable
 | 4 | Official verification required |
 | 5 | Rate limited |
 | 6 | Unverified/unsupported capability |
+| 7 | Login browser runtime/setup failure |
 
 No automatic failed-request retry loop. Normal flight polling is bounded and follows the website's own continuation protocol. MTop's ordinary token bootstrap is attempted once; there is no captcha solver, device fingerprint emulation or anti-bot bypass. A public webpage interface is not a supported, stable open API contract.
 
@@ -149,3 +151,11 @@ CI checks Node 22/24 on Linux/macOS/Windows without real credentials. Tests use 
 CLI command design references [alibaba-flyai/flyai-skill](https://github.com/alibaba-flyai/flyai-skill), MIT. Runtime implementation is independently written against publicly served website behavior; no upstream embedded secrets or bundled CLI source are included. This project is not affiliated with Alibaba, Fliggy, Taobao or Marriott.
 
 MIT © 2026 LampScript.
+
+## Login browser setup
+
+Installing the npm CLI installs the Playwright library, not its browser binaries. Run `open-piggy browser install` on the machine where login executes; it uses the exact installed Playwright CLI, not npx/latest. `open-piggy browser doctor` checks a private persistent Chromium context on about:blank only and exits nonzero if setup is not ready. It does not visit any login page or install OS packages/change browser security flags.
+
+Missing browser, system libraries, incompatible runtime and missing graphical display have distinct sanitized errors. QR mode is headless; --browser requires a graphical display. A known terminal login-start failure now returns status1 and a nonzero exit code; polling an existing task remains a successful read whose data.state must be checked.
+
+The real Chromium offline component fixture is `npm run test:login-browser`. It blocks all browser network requests and exercises synthetic iframe/canvas QR, handoff, terminal rendering, synthetic persistence and cleanup. This is not real official login acceptance. Linux deployment findings: [dev2 validation](docs/dev2-validation.zh-CN.md).
