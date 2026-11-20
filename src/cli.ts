@@ -9,7 +9,8 @@ import {browserDoctor,installBrowser} from './browser-runtime.js';
 import { PiggyError, exitCode } from './errors.js';
 import { createClient, loggedIn } from './http.js';
 import { jarFromSession, loadSession } from './session.js';
-import { searchFlight, type FlightOptions } from './flight.js';
+import { FlightVerificationRequired, verifyInBrowser, withFlightVerification } from './flight-verification.js';
+import { flightUrl, searchFlight, type FlightOptions } from './flight.js';
 import { searchPoi } from './poi.js';
 import { searchKeyword } from './keyword.js';
 import { searchHotel,searchMarriottHotel } from './hotel.js';
@@ -48,7 +49,7 @@ program.command('capabilities').description('Show verified capabilities and rele
 const browser=program.command('browser').description('Install and diagnose the matching login browser without opening any website');
 browser.command('install').action(async()=>output(await installBrowser()));
 browser.command('doctor').action(async()=>{const report=await browserDoctor();if(report.ready){output(report);return;}console.log(JSON.stringify({status:1,error:report.error,data:report}));process.exitCode=exitCode(report.error?.code??'UPSTREAM_ERROR');});
-const auth=program.command('auth').description('Official QR login; browser is used only here');
+const auth=program.command('auth').description('Manage the official login session');
 auth.command('login').description('Scan official QR in terminals; use --detach for background Agent tasks').option('--qr','Print QR and wait for login in interactive terminals').option('--url','Print the same-host private QR handoff URL; does not transfer cookies').option('--plain','With --url: print only the handoff URL on stdout (no JSON)').option('--browser','Run a tracked visible-browser task for manual official verification').option('--wait','Print QR on stderr and wait for authentication, including non-TTY shells').option('--detach','Return task JSON without foreground waiting (Agent mode)').action(async o=>{
  plainAuthUrl=Boolean(o.plain);
  if([o.qr,o.url,o.browser].filter(Boolean).length>1)throw new PiggyError('INVALID_ARGUMENT','Choose only one of --qr, --url or --browser.');
@@ -88,8 +89,24 @@ transport(program.command('search-flight').description('Live HTTP flights with d
  if(o.returnFlights && !pairs.some(p=>p.backDate))throw new PiggyError('INVALID_ARGUMENT','--return-flights requires return dates.');
  if(o.journeyType && !['1','2'].includes(o.journeyType))throw new PiggyError('INVALID_ARGUMENT','journey-type must be 1 or 2.');
 
- const client=createClient(await jarFromSession(await loadSession()));if(!await loggedIn(client))throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
- output(await searchDatePairs(o as TransportOptions,pairs,fixed=>searchFlight(fixed as FlightOptions,client)));
+ let session = await loadSession();
+ let client = createClient(await jarFromSession(session));
+ let checkedLogin = false;
+ output(await searchDatePairs(o as TransportOptions, pairs, async fixed => {
+  const flight = fixed as FlightOptions;
+  return withFlightVerification(flightUrl(flight), async current => {
+   if (current !== session) {
+    session = current;
+    client = createClient(await jarFromSession(session));
+    checkedLogin = false;
+   }
+   if (!checkedLogin) {
+    if (!await loggedIn(client)) throw new PiggyError('LOGIN_REQUIRED','Official session expired; run auth login.');
+    checkedLogin = true;
+   }
+   return searchFlight(flight, client);
+  }, session, process.stdin.isTTY && process.stderr.isTTY ? verifyInBrowser : undefined);
+ }));
 });
 transport(program.command('search-train').description('Verified direct train search; may return future presale schedules')).option('--limit <number>','Limit returned trains after filtering').action(async o=>{
  supported(o,['origin','destination','depDate','journeyType','seatClassName','transportNo','totalDurationHour','sortType','maxPrice','limit','depDateStart','depDateEnd','backDate','backDateStart','backDateEnd','maxDatePairs','depHourStart','depHourEnd','arrHourStart','arrHourEnd']);dates(o);
@@ -116,6 +133,7 @@ catch(e) {
  if(e instanceof CommanderError && e.exitCode===0)process.exitCode=0;
  else {
   const error=e instanceof PiggyError?e:e instanceof CommanderError?new PiggyError('INVALID_ARGUMENT',e.message):new PiggyError('UPSTREAM_ERROR','Unexpected error; no response or credentials have been logged.');
-  console.error(error.message);if(!plainAuthUrl)console.log(JSON.stringify({status:1,error:{code:error.code,message:error.message}}));process.exitCode=exitCode(error.code);
+  const handoff = error instanceof FlightVerificationRequired ? {action:'manual_verification',url:error.pageUrl} : undefined;
+  console.error(error.message);if(!plainAuthUrl)console.log(JSON.stringify({status:1,error:{code:error.code,message:error.message,...(handoff ? {handoff} : {})}}));process.exitCode=exitCode(error.code);
  }
 }

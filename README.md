@@ -1,6 +1,6 @@
 # open-piggy 🐷
 
-An independent, open-source CLI for publicly served Fliggy website interfaces. Queries use **HTTP only**. A browser is used only for official QR login and redirects, with a dedicated local session. No FlyAI MCP/API key, shared browser cookies, third-party AI model, order creation or payment.
+An independent, open-source CLI for publicly served Fliggy website interfaces. Queries use **HTTP only**. A dedicated browser handles official login and human verification during interactive flight searches. No FlyAI MCP/API key, shared browser cookies, third-party AI model, order creation or payment.
 
 **Preview, not a feature-complete replacement for FlyAI.** Seven query categories now have live HTTP evidence: flights, trains, popular attractions, keyword products, mainland hotels, Marriott-brand hotels and dated hotel-package associations. Each has explicit scope limits. AI search remains blocked rather than faked. See [capabilities](docs/compatibility.md) and [endpoint evidence](docs/endpoints.md).
 
@@ -62,6 +62,10 @@ Only the tool's own official-browser session is saved, after HTTP verification. 
 Local state: `~/.config/open-piggy/` (POSIX directory0700, files0600); `OPEN_PIGGY_HOME` overrides it. Windows users should protect the directory with a private ACL. A global install needs the matching Playwright Chromium; see `npm ls -g playwright` and install that Playwright version's Chromium. Detailed commands, state semantics, limitations and remote-loopback guidance: [Agent login](docs/agent-login.zh-CN.md).
 
 ## Flight queries
+
+When Fliggy requests verification during an interactive flight search, the CLI opens the affected itinerary in a visible browser using its own session. Complete the official verification and press Enter in the terminal to retry the affected date pair once. The updated browser session is used in memory for the current command. Closing the window or pressing Ctrl+C at the prompt cancels verification.
+
+In unattended runs, the CLI exits with code 4 and includes the official itinerary URL in `error.handoff.url` for manual follow-up. If the retry also requires verification, the same handoff is returned.
 
 ```sh
 open-piggy search-flight \
