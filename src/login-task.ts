@@ -7,7 +7,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {z} from 'zod';
 import {sessionDirectory} from './session.js';
 import {PiggyError} from './errors.js';
-const schema=z.object({loginId:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['pending','authenticated','expired','cancelled','verification_required','failed']),mode:z.enum(['qr','browser']),workerPid:z.number().int().positive().max(2147483647).optional(),qrExpiresAt:z.null(),createdAt:z.string().datetime(),expiresAt:z.string().datetime(),qrPath:z.string().nullable(),handoffUrl:z.string().nullable(),cancelRequested:z.boolean().optional(),error:z.object({code:z.string(),message:z.string()}).optional()});
+const schema=z.object({loginId:z.string().regex(/^[a-f0-9]{32}$/),state:z.enum(['pending','authenticated','expired','cancelled','verification_required','failed']),mode:z.enum(['qr','browser']),workerPid:z.number().int().positive().max(2147483647).optional(),phase:z.enum(['queued','opening_login','waiting_for_qr','qr_ready','waiting_for_user']).optional(),qrExpiresAt:z.null(),createdAt:z.string().datetime(),expiresAt:z.string().datetime(),qrPath:z.string().nullable(),handoffUrl:z.string().nullable(),cancelRequested:z.boolean().optional(),error:z.object({code:z.string(),message:z.string()}).optional()});
 export type LoginTask=z.infer<typeof schema>;
 export function taskDirectory(id:string,home=sessionDirectory()):string {
  if(!/^[a-f0-9]{32}$/.test(id))throw new PiggyError('INVALID_ARGUMENT','login-id must be the ID returned by auth login.');
@@ -66,7 +66,7 @@ export async function startLogin(home=sessionDirectory(),launcher:(id:string)=>v
  if(existing){const task=await readTask(existing,home);if(task.state==='pending'&&!await cancelled(existing,home))return task;if(task.state==='expired'||task.state!=='pending')await releaseLoginLock(existing,home);else throw new PiggyError('LOGIN_REQUIRED','Previous login is cancelling; retry after its worker exits.');}
  const loginId=randomBytes(16).toString('hex');
  const staging=join(home,`active-login-${loginId}`),lock=join(home,'active-login');
- const task:LoginTask={loginId,state:'pending',mode,qrExpiresAt:null,createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+300000).toISOString(),qrPath:null,handoffUrl:null};
+ const task:LoginTask={loginId,state:'pending',mode,phase:'queued',qrExpiresAt:null,createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+300000).toISOString(),qrPath:null,handoffUrl:null};
  await writeTask(task,home);
  await mkdir(staging,{mode:0o700});await writeFile(join(staging,'id'),loginId,{mode:0o600});
  try {

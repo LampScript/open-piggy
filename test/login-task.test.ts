@@ -71,3 +71,10 @@ test('expired task with no live worker can be cancelled so logout and browser re
  const dir=await home();await saveSession(session,dir);const task=await startLogin(dir,()=>{});await writeTask({...task,expiresAt:'2000-01-01T00:00:00.000Z'},dir);
  try{await cancelActive(dir);await clearSession(dir);assert.equal((await readTask(task.loginId,dir)).state,'cancelled');assert.equal(await activeId(dir),undefined);await assert.rejects(loadSession(dir));const next=await startLogin(dir,()=>{},'browser');assert.equal(next.mode,'browser');assert.notEqual(next.loginId,task.loginId);}finally{await cleanup(dir);}
 });
+test('QR task with no extracted widget fails explicitly instead of staying pending until task expiry',async t=>{
+ const dir=await home();const task=await startLogin(dir,()=>{});
+ try{const driver:LoginDriver={start:async()=>{},inspect:async()=>{t.mock.method(Date,'now',()=>Date.parse(task.createdAt)+31000);return {state:'pending'};},close:async()=>{}};
+ await runLoginTask(task.loginId,driver,dir,async()=>{await cancelTask(task.loginId,dir);});
+ const state=await readTask(task.loginId,dir);assert.equal(state.state,'failed');assert.equal(state.error?.code,'CAPABILITY_UNVERIFIED');assert.match(state.error?.message||'',/QR/);await assert.rejects(loadSession(dir));
+ }finally{t.mock.restoreAll();await cleanup(dir);}
+});
