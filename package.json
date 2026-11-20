@@ -1,7 +1,7 @@
 {
   "name": "open-piggy",
-  "version": "0.1.0-preview.4",
-  "description": "Independent Fliggy web HTTP CLI \u2014 capability-verified preview",
+  "version": "0.1.0-preview.5",
+  "description": "Independent Fliggy web HTTP CLI — capability-verified preview",
   "type": "module",
   "license": "MIT",
   "author": "LampScript",

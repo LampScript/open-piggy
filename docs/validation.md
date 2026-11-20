@@ -32,3 +32,7 @@ Flight baggage/fare conditions and GDS fares, train transfers and full provider 
 ## Preview.3 login validation
 
 Default QR and URL login use a detached task with a private loopback handoff; explicit browser mode uses the same lock, cancellation and persistence lifecycle. Offline tests cover synthetic PNG terminal rendering, official-login URL/selector scope, task creation/status, same-home concurrency, cancellation before startup, QR+browser logout races, provider failure redaction, expiration, empty legacy lock recovery, private files and token/Host/path restrictions. The new provider has NOT been run against the restricted official login URL through any browser/headless/HTTP/proxy channel. Real QR widget and end-to-end acceptance remain pending; prior headed-login acceptance records apply only to earlier releases.
+
+## Preview.5 QR extraction checks
+
+Synthetic fixtures reproduce and verify fixes for rejected login-frame paths and missing canvas matching. Additional cases cover hidden first matches, decorative images, valid container QR images, nonofficial origins/ports and explicitly labeled QR-mode controls. This validates extraction code offline; it is not live official QR authentication acceptance.

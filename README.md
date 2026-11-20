@@ -8,10 +8,10 @@ An independent, open-source CLI for publicly served Fliggy website interfaces. Q
 
 ## Install
 
-Node.js 22 or later. Download `open-piggy-0.1.0-preview.4.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
+Node.js 22 or later. Download `open-piggy-0.1.0-preview.5.tgz` from [GitHub Releases](https://github.com/LampScript/open-piggy/releases), then:
 
 ```sh
-npm install -g ./open-piggy-0.1.0-preview.4.tgz
+npm install -g ./open-piggy-0.1.0-preview.5.tgz
 open-piggy capabilities
 ```
 
@@ -52,7 +52,7 @@ node dist/cli.js auth cancel --login-id <returned-loginId>
 node dist/cli.js auth logout
 ```
 
-`auth login` equals `--qr`. It returns a task ID, private QR PNG path when ready, a token-protected loopback handoff URL, and polling/cancellation commands. An interactive terminal can render the official QR on stderr; stdout stays JSON. The task reports its startup phase and fails explicitly if no QR is extracted within30seconds after the page opens; this does not claim to fix unverified official-widget discovery. `--url` hands off the SAME background session rather than pretending a generic login link will return another browser's cookies. `--browser` creates an explicitly visible task for manual official verification.
+`auth login` equals `--qr`. It returns a task ID, private QR PNG path when ready, a token-protected loopback handoff URL, and polling/cancellation commands. An interactive terminal can render the official QR on stderr; stdout stays JSON. The extractor supports login-origin embedded frames, visible img/canvas/container QR candidates and explicitly labeled QR-login mode switches. Candidates must decode as QR before publication. These paths have synthetic fixture tests, not online official-widget acceptance. Missing QR still fails explicitly after30seconds. `--url` hands off the SAME background session rather than pretending a generic login link will return another browser's cookies. `--browser` creates an explicitly visible task for manual official verification.
 
 `auth status --login-id` only reads local state; `auth status` without an ID verifies the saved session with the official HTTP endpoint. A pending task is not a successful login. The five-minute `expiresAt` is the task deadline; the official QR may expire earlier (`qrExpiresAt:null`). New login tasks, QR images and handoff links are private transient authentication data.
 
