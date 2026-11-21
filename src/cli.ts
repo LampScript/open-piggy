@@ -9,6 +9,7 @@ import {browserDoctor,installBrowser} from './browser-runtime.js';
 import { PiggyError, exitCode } from './errors.js';
 import { createClient, loggedIn } from './http.js';
 import { jarFromSession, loadSession } from './session.js';
+import { resumeFlightPage } from './flight-page.js';
 import { FlightVerificationRequired, verifyInBrowser, withFlightVerification } from './flight-verification.js';
 import { flightUrl, searchFlight, type FlightOptions } from './flight.js';
 import { searchPoi } from './poi.js';
@@ -82,6 +83,7 @@ auth.command('status').option('--login-id <id>','Read a login task without brows
 });
 auth.command('cancel').requiredOption('--login-id <id>').action(async o=>output(await cancelTask(o.loginId)));
 auth.command('logout').action(async()=>output(await authLogout()));
+program.command('resume-flight').description('Read the verified itinerary in the default browser (macOS)').requiredOption('--url <url>').option('--outbound <index>','Select a displayed outbound row').option('--return <index>','Select a displayed return row').action(async o => output(await resumeFlightPage(o.url,o)));
 transport(program.command('search-flight').description('Live HTTP flights with date ranges, journey filters and exact segment sequences')).option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--experimental','Compatibility flag; fixed-date HTTP flight transport has passed live acceptance').option('--outbound-flights <numbers>','Exact outbound segment sequence').option('--return-flights <numbers>','Exact return segment sequence').action(async o=>{
  supported(o,['origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental','depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs','transferCity','depHourStart','depHourEnd','arrHourStart','arrHourEnd','outboundFlights','returnFlights']);dates(o);
  const pairs=planDates(o as TransportOptions);
@@ -127,7 +129,7 @@ catch(e) {
  if(e instanceof CommanderError && e.exitCode===0)process.exitCode=0;
  else {
   const error=e instanceof PiggyError?e:e instanceof CommanderError?new PiggyError('INVALID_ARGUMENT',e.message):new PiggyError('UPSTREAM_ERROR','Unexpected error; no response or credentials have been logged.');
-  const handoff = error instanceof FlightVerificationRequired ? {action:'manual_verification',url:error.pageUrl} : undefined;
+  const handoff = error instanceof FlightVerificationRequired ? {action:'manual_verification',url:error.pageUrl,instructions:'请在默认浏览器完成验证，保留该行程标签页。回复好了后，调用 resumeArgs 读取网页报价。',resumeArgs:['resume-flight','--url',error.pageUrl]} : undefined;
   console.error(error.message);if(!plainAuthUrl)console.log(JSON.stringify({status:1,error:{code:error.code,message:error.message,...(handoff ? {handoff} : {})}}));process.exitCode=exitCode(error.code);
  }
 }

@@ -65,7 +65,15 @@ Local state: `~/.config/open-piggy/` (POSIX directory0700, files0600); `OPEN_PIG
 
 When Fliggy requests verification during an interactive flight search, the CLI opens the affected itinerary in your system default browser. After manual verification, press Enter in the terminal to retry the affected date pair once with the CLI session, or press Ctrl+C to cancel. Browser login and verification state stay in that browser. The website may show prices even if the CLI retry still needs verification.
 
-In unattended runs, the CLI exits with code 4 and includes the official itinerary URL in `error.handoff.url` for manual follow-up. If the retry also requires verification, the same handoff is returned.
+In unattended runs, the CLI exits with code 4 and includes the official itinerary URL in `error.handoff.url` for manual follow-up. The handoff also includes a `resumeArgs` argument array. After the user completes verification, run those arguments with open-piggy on the same Mac. Keep the matching itinerary tab selected. The reader uses macOS Accessibility and the Swift command-line tools to read the default browser. It never imports browser cookies.
+
+```sh
+open-piggy resume-flight --url "$itinerary_url"
+open-piggy resume-flight --url "$itinerary_url" --outbound 1
+open-piggy resume-flight --url "$itinerary_url" --return 1
+```
+
+Use the indices from the current page. The first command reads the current selection. The other two select flight rows and read the updated page. Check the original search filters against the displayed rows. The options show list prices. For a round-trip report, use the selected directions and a matching cabin from `offers`. The CLI returns the observation time and the browser source so a caller can save the result in its own price history. Other platforms support the manual URL handoff.
 
 ```sh
 open-piggy search-flight \
