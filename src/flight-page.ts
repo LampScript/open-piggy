@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { reuseFlightTab } from './flight-tab.js';
 import { PiggyError } from './errors.js';
 import { FlightVerificationRequired } from './flight-verification.js';
 
@@ -69,16 +70,34 @@ export async function resumeFlightPage(input: string, selection: {outbound?:stri
       throw new PiggyError('UPSTREAM_ERROR', '读取默认浏览器失败。请检查 Swift 命令行工具和辅助功能权限。'+(msg?.startsWith('当前页面没有') ? msg : ''));
     }
   };
+  let navigated = false;
+  let initial:string|undefined;
+  if (!index) {
+    try { initial = await read(); }
+    catch (error) {
+      if (!(error instanceof PiggyError) || error.code!=='PAGE_NOT_READY') throw error;
+      const reused=await reuseFlightTab(page);
+      if (reused==='absent'||reused==='unsupported') throw error;
+      navigated=true;
+    }
+  }
   if (index) await read(selection.outbound ? '选为去程' : '选为返程',index);
   for (let attempt=0; attempt<8; attempt++) {
-    const raw = await read();
+    let raw:string;
+    try { raw=initial ?? await read(); }
+    catch(error) {
+      if(!navigated || !(error instanceof PiggyError) || error.code!=='PAGE_NOT_READY' || attempt===7) throw error;
+      await delay(500);
+      continue;
+    }
+    initial=undefined;
     if (/请完成(?:安全|滑块)?验证|请拖动滑块|请通过安全验证/.test(raw)) throw new FlightVerificationRequired(page.href,'required',{stage:'browser'});
     const state = parseFlightPage(raw);
     if (state && (state.options.length || state.offers.length) &&
         (!selection.outbound || state.outbound) && (!selection.return || state.offers.length)) {
       return {source:'default-browser',observedAt:new Date().toISOString(),url:page.href,...state};
     }
-    if (!index) break;
+    if (!index && !navigated) break;
     await delay(500);
   }
   throw new PiggyError('PAGE_NOT_READY','对应行程或报价尚未加载。',{stage:'browser'});

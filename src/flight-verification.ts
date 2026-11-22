@@ -2,6 +2,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stderr } from 'node:process';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { reuseFlightTab } from './flight-tab.js';
 import { PiggyError } from './errors.js';
 
 export class FlightVerificationRequired extends PiggyError {
@@ -34,10 +35,10 @@ export async function verifyInBrowser(pageUrl: URL): Promise<void> {
   stderr.write(`请在系统默认浏览器中查看飞猪行程：${pageUrl.href}\n`);
   const launch = promisify(execFile);
   try {
-    if (process.platform === 'win32') {
-      await launch('rundll32.exe', ['url.dll,FileProtocolHandler', pageUrl.href]);
-    } else {
-      await launch(process.platform === 'darwin' ? 'open' : 'xdg-open', [pageUrl.href]);
+    const reused = await reuseFlightTab(pageUrl);
+    if (reused === 'absent') await launch('open',[pageUrl.href]);
+    else if (reused === 'unsupported') {
+      stderr.write('请在现有浏览器标签页打开上方行程链接。\n');
     }
   } catch {
     stderr.write('无法自动打开默认浏览器，请手动打开上方链接。\n');

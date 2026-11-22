@@ -15,6 +15,7 @@
   "files": [
     "dist",
     "native/flight-page.swift",
+    "native/reuse-flight-tab.js",
     "README.md",
     "LICENSE",
     "docs"
