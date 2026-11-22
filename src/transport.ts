@@ -21,7 +21,16 @@ export function planDates(o:TransportOptions):DatePair[] {
  if(!Number.isSafeInteger(budget)||budget<1)throw new PiggyError('INVALID_ARGUMENT','max-date-pairs must be a positive integer.');
  const departures=dateWindow(o.depDate,o.depDateStart,o.depDateEnd,'Departure');
  const returns=o.backDate||o.backDateStart||o.backDateEnd?dateWindow(o.backDate,o.backDateStart,o.backDateEnd,'Return'):undefined;
+ if(returns && returns.end<departures.start)throw new PiggyError('INVALID_ARGUMENT','No return date is on or after departure.');
  const pairs:DatePair[]=[];
+ let baseline:DatePair|undefined;
+ if(o.baselinePair !== undefined){
+  const fields=o.baselinePair.split(',');
+  if(fields.length!==2 || !returns)throw new PiggyError('INVALID_ARGUMENT','baseline-pair requires a departure,return pair and a round-trip query.');
+  baseline={depDate:date(fields[0]!,'Baseline departure'),backDate:date(fields[1]!,'Baseline return')};
+  if(baseline.backDate!<baseline.depDate)throw new PiggyError('INVALID_ARGUMENT','Baseline return must not precede departure.');
+  pairs.push(baseline);
+ }
  const epoch=(value:string)=>Date.parse(`${value}T00:00:00Z`);
  const end=epoch(returns && returns.end<departures.end?returns.end:departures.end);
  for(let day=epoch(departures.start);day<=end;day+=86400000){
@@ -29,11 +38,12 @@ export function planDates(o:TransportOptions):DatePair[] {
   const first=returns?Math.max(day,epoch(returns.start)):day;
   const last=returns?epoch(returns.end):day;
   for(let back=first;back<=last;back+=86400000){
-   pairs.push(returns?{depDate,backDate:new Date(back).toISOString().slice(0,10)}:{depDate});
+   const pair=returns?{depDate,backDate:new Date(back).toISOString().slice(0,10)}:{depDate};
+   if(baseline && pair.depDate===baseline.depDate && pair.backDate===baseline.backDate)continue;
+   pairs.push(pair);
    if(pairs.length>budget)throw new PiggyError('INVALID_ARGUMENT',`Date range exceeds max-date-pairs=${budget}. Narrow the range or explicitly increase the budget.`);
   }
  }
- if(!pairs.length)throw new PiggyError('INVALID_ARGUMENT','No return date is on or after departure.');
  for(const key of ['depHourStart','depHourEnd','arrHourStart','arrHourEnd'])if(o[key]!==undefined && (!/^\d+$/.test(o[key]!)||Number(o[key])>23))throw new PiggyError('INVALID_ARGUMENT',`${key} must be an integer hour from 0 to 23.`);
  for(const side of ['dep','arr'])if(o[`${side}HourStart`]!==undefined&&o[`${side}HourEnd`]!==undefined&&Number(o[`${side}HourStart`])>Number(o[`${side}HourEnd`]))throw new PiggyError('INVALID_ARGUMENT',`${side} hour start must not follow end; overnight windows require separate searches.`);
  if(o.sortType && !/^[1-8]$/.test(o.sortType))throw new PiggyError('INVALID_ARGUMENT','sort-type must be 1 through 8.');
@@ -60,7 +70,7 @@ export async function searchDatePairs(o:TransportOptions,pairs:DatePair[],run:(o
  const items:Record<string,unknown>[]=[];const coverages:unknown[]=[];const warnings=new Set<string>();const verifications=new Set<unknown>();
  for(const pair of pairs){
   const fixed:TransportOptions={...o,...pair};
-  for(const key of ['depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs'])delete fixed[key];
+  for(const key of ['depDateStart','depDateEnd','backDateStart','backDateEnd','baselinePair','maxDatePairs'])delete fixed[key];
   const result=await run(fixed) as SearchResult;
   for(const warning of (result.warnings as string[]|undefined)??[])warnings.add(warning);
   if(result.verification)verifications.add(result.verification);

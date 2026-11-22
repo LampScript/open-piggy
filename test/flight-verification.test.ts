@@ -29,3 +29,9 @@ test('persistent challenge stops after one handoff, unrelated failures propagate
   await assert.rejects(withFlightVerification(page, async () => { throw failure; },
     async () => assert.fail('unexpected browser launch')), error => error === failure);
 });
+
+test('manual handoff preserves the status and stage that triggered it',async()=>{
+ const e=new PiggyError('VERIFICATION_REQUIRED','challenge',{httpStatus:403,stage:'return'});
+ await assert.rejects(withFlightVerification(page,async()=>{throw e;}),err=>
+  err instanceof FlightVerificationRequired && err.context?.httpStatus===403 && err.context.stage==='return');
+});

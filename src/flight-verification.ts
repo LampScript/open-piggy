@@ -5,11 +5,11 @@ import { promisify } from 'node:util';
 import { PiggyError } from './errors.js';
 
 export class FlightVerificationRequired extends PiggyError {
-  constructor(readonly pageUrl: string, outcome: 'required' | 'retried' | 'cancelled') {
+  constructor(readonly pageUrl: string, outcome: 'required' | 'retried' | 'cancelled', context?:PiggyError['context']) {
     super('VERIFICATION_REQUIRED', outcome === 'cancelled'
       ? '已取消人工验证，本次查票已停止。' : outcome === 'retried'
       ? '人工处理后查票仍需验证。请打开飞猪行程页查看，或稍后重试。'
-      : '查票需要人工验证。请打开飞猪行程页处理，交互终端可在验证后重试。');
+      : '查票需要人工验证。请打开飞猪行程页处理，交互终端可在验证后重试。',context);
   }
 }
 
@@ -20,13 +20,13 @@ export async function withFlightVerification<T>(
   try { return await query(); }
   catch (error) {
     if (!(error instanceof PiggyError) || error.code !== 'VERIFICATION_REQUIRED') throw error;
-    if (!verify) throw new FlightVerificationRequired(page.href, 'required');
+    if (!verify) throw new FlightVerificationRequired(page.href, 'required',error.context);
   }
   await verify(page);
   try { return await query(); }
   catch (error) {
     if (!(error instanceof PiggyError) || error.code !== 'VERIFICATION_REQUIRED') throw error;
-    throw new FlightVerificationRequired(page.href, 'retried');
+    throw new FlightVerificationRequired(page.href, 'retried',error.context);
   }
 }
 

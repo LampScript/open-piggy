@@ -65,13 +65,15 @@ export async function resumeFlightPage(input: string, selection: {outbound?:stri
     catch (e) {
       const msg = (e as {stderr?:string}).stderr?.trim();
       if (msg === '请将对应日期的飞猪行程标签页切到前台。' || msg === '请在默认浏览器中打开飞猪行程。')
-        throw new FlightVerificationRequired(page.href,'required');
+        throw new PiggyError('PAGE_NOT_READY',msg,{stage:'browser'});
       throw new PiggyError('UPSTREAM_ERROR', '读取默认浏览器失败。请检查 Swift 命令行工具和辅助功能权限。'+(msg?.startsWith('当前页面没有') ? msg : ''));
     }
   };
   if (index) await read(selection.outbound ? '选为去程' : '选为返程',index);
   for (let attempt=0; attempt<8; attempt++) {
-    const state = parseFlightPage(await read());
+    const raw = await read();
+    if (/请完成(?:安全|滑块)?验证|请拖动滑块|请通过安全验证/.test(raw)) throw new FlightVerificationRequired(page.href,'required',{stage:'browser'});
+    const state = parseFlightPage(raw);
     if (state && (state.options.length || state.offers.length) &&
         (!selection.outbound || state.outbound) && (!selection.return || state.offers.length)) {
       return {source:'default-browser',observedAt:new Date().toISOString(),url:page.href,...state};
@@ -79,5 +81,5 @@ export async function resumeFlightPage(input: string, selection: {outbound?:stri
     if (!index) break;
     await delay(500);
   }
-  throw new FlightVerificationRequired(page.href,'required');
+  throw new PiggyError('PAGE_NOT_READY','对应行程或报价尚未加载。',{stage:'browser'});
 }

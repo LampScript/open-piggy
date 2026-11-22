@@ -25,13 +25,13 @@ export function readFlightQuery(html:string):{depCity:string;arrCity:string;depC
  if(!/isValid\s*:\s*true/.test(html))throw new PiggyError('INVALID_ARGUMENT','Official website did not recognize the route. Use IATA city/airport codes.');
  return {depCity:queryField(html,'depCity'),arrCity:queryField(html,'arrCity'),depCityName:queryField(html,'depCityName'),arrCityName:queryField(html,'arrCityName')};
 }
-export async function pollFlights(client:WebClient, journeys:Journey[], tripType:string, mode:string):Promise<{flights:z.infer<typeof item>[];products:z.infer<typeof product>[]}> {
+export async function pollFlights(client:WebClient, journeys:Journey[], tripType:string, mode:'0'|'1'|'2'):Promise<{flights:z.infer<typeof item>[];products:z.infer<typeof product>[]}> {
  const url=new URL('https://sijipiao.fliggy.com/ie/flight_search_result_poller.do');
  url.search=new URLSearchParams({supportMultiTrip:'true',searchBy:'',childPassengerNum:'0',infantPassengerNum:'0',searchJourney:JSON.stringify(journeys),tripType,searchCabinType:'0',agentId:'-1',controller:'1',searchMode:mode,b2g:'0',formNo:'-1',cardId:'',needMemberPrice:'false',callback:'openPiggy'}).toString();
  let flights:z.infer<typeof item>[]=[];let products:z.infer<typeof product>[]=[];
  const deadline=Date.now()+60000;
  for(let count=0;count<20 && Date.now()<deadline;count++) {
-  const parsed=envelope.safeParse(await client.json(url));
+  const parsed=envelope.safeParse(await client.json(url,{'0':'outbound','1':'return','2':'quote'}[mode]));
   if(!parsed.success)throw new PiggyError('UPSTREAM_SCHEMA_CHANGED','Official flight response no longer matches the observed webpage schema.');
   const r=parsed.data;
   if(r.status!==200)throw new PiggyError(r.status===401?'LOGIN_REQUIRED':'UPSTREAM_ERROR',`Official flight endpoint failed (business status ${r.status}).`);
@@ -60,7 +60,7 @@ function selectedFlightUrl(page:URL,flights:z.infer<typeof info>[]):string {
 }
 
 export async function searchFlight(options:FlightOptions,client:WebClient):Promise<unknown> {
- const page=flightUrl(options);const route=readFlightQuery(await client.text(page));
+ const page=flightUrl(options);const route=readFlightQuery(await client.text(page,'itinerary'));
  const journey:Journey={depCityCode:route.depCity,arrCityCode:route.arrCity,depCityName:encodeURIComponent(route.depCityName),arrCityName:encodeURIComponent(route.arrCityName),depDate:options.depDate,selectedFlights:[]};
  const journeys=[journey];
  if(options.backDate)journeys.push({depCityCode:route.arrCity,arrCityCode:route.depCity,depCityName:journey.arrCityName,arrCityName:journey.depCityName,depDate:options.backDate,selectedFlights:[]});

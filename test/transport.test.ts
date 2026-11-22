@@ -22,3 +22,19 @@ test('local hour buckets and whole-trip duration/departure/direct sorting match 
 test('huge mistaken ranges stop at the date-pair budget without building the Cartesian product',()=>{
  assert.throws(()=>planDates({depDateStart:'2000-01-01',depDateEnd:'9999-12-31',backDateStart:'2000-01-01',backDateEnd:'9999-12-31',maxDatePairs:'2'}),/exceeds max-date-pairs=2/);
 });
+
+test('baseline and flexible results reuse one query and budget slot per distinct round trip', async()=>{
+ const options={depDateStart:'2027-02-02',depDateEnd:'2027-02-06',backDateStart:'2027-02-10',backDateEnd:'2027-02-14',baselinePair:'2027-02-04,2027-02-12',maxDatePairs:'25'};
+ const calls:string[]=[];
+ const result=await searchDatePairs(options,planDates(options),async fixed=>{
+  assert.equal(fixed.baselinePair,undefined);
+  calls.push([fixed.depDate,fixed.backDate].join(','));
+  return {itemList:[{ticketPrice:42}]};
+ });
+ assert.equal(calls[0],options.baselinePair);
+ assert.equal(calls.length,25);
+ assert.equal(new Set(calls).size,25);
+ assert.equal(result.itemList.length,25);
+ assert.throws(()=>planDates({...options,baselinePair:'2027-02-01,2027-02-12'}),/exceeds/);
+ assert.equal(planDates({...options,baselinePair:'2027-02-01,2027-02-12',maxDatePairs:'26'}).length,26);
+});
