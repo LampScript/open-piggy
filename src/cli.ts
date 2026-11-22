@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
+import { liveFlightTable, savedFlightTable } from './flight-summary.js';
 import { Command, CommanderError } from 'commander';
 import { CookieJar } from 'tough-cookie';
 import { z } from 'zod';
@@ -83,9 +85,15 @@ auth.command('status').option('--login-id <id>','Read a login task without brows
 });
 auth.command('cancel').requiredOption('--login-id <id>').action(async o=>output(await cancelTask(o.loginId)));
 auth.command('logout').action(async()=>output(await authLogout()));
+program.command('flight-summary <file>').description('Display a Markdown fare table from a saved query').action(async file=>{
+ let raw:unknown;
+ try { raw=JSON.parse(await readFile(file,'utf8')); }
+ catch(e){if(e instanceof SyntaxError || (e as NodeJS.ErrnoException).code==='ENOENT')throw new PiggyError('INVALID_ARGUMENT','Provide an existing flight result JSON file.');throw e;}
+ console.log(savedFlightTable(raw));
+});
 program.command('resume-flight').description('Read the verified itinerary in the default browser (macOS)').requiredOption('--url <url>').option('--outbound <index>','Select a displayed outbound row').option('--return <index>','Select a displayed return row').action(async o => output(await resumeFlightPage(o.url,o)));
-transport(program.command('search-flight').description('Live HTTP flights with date ranges, journey filters and exact segment sequences')).option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--baseline-pair <departure,return>','Query this round trip first and reuse it in the date range').option('--experimental','Compatibility flag; fixed-date HTTP flight transport has passed live acceptance').option('--outbound-flights <numbers>','Exact outbound segment sequence').option('--return-flights <numbers>','Exact return segment sequence').action(async o=>{
- supported(o,['origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental','baselinePair','depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs','transferCity','depHourStart','depHourEnd','arrHourStart','arrHourEnd','outboundFlights','returnFlights']);dates(o);
+transport(program.command('search-flight').description('Live HTTP flights with date ranges, journey filters and exact segment sequences')).option('--table','Print the Markdown fare table on stdout').option('--limit <number>','Candidates examined per direction; coverage is explicit').option('--baseline-pair <departure,return>','Query this round trip first and reuse it in the date range').option('--experimental','Compatibility flag; fixed-date HTTP flight transport has passed live acceptance').option('--outbound-flights <numbers>','Exact outbound segment sequence').option('--return-flights <numbers>','Exact return segment sequence').action(async o=>{
+ supported(o,['table','origin','destination','depDate','backDate','transportNo','totalDurationHour','journeyType','sortType','limit','maxPrice','seatClassName','experimental','baselinePair','depDateStart','depDateEnd','backDateStart','backDateEnd','maxDatePairs','transferCity','depHourStart','depHourEnd','arrHourStart','arrHourEnd','outboundFlights','returnFlights']);dates(o);
  const pairs=planDates(o as TransportOptions);
  if(!o.destination)throw new PiggyError('INVALID_ARGUMENT','--destination is required.');
  if(o.returnFlights && !pairs.some(p=>p.backDate))throw new PiggyError('INVALID_ARGUMENT','--return-flights requires return dates.');
@@ -93,7 +101,7 @@ transport(program.command('search-flight').description('Live HTTP flights with d
 
  const client = createClient(await jarFromSession(await loadSession()));
  let checkedLogin = false;
- output(await searchDatePairs(o as TransportOptions, pairs, async fixed => {
+ const result=await searchDatePairs(o as TransportOptions, pairs, async fixed => {
   const flight = fixed as FlightOptions;
   return withFlightVerification(flightUrl(flight), async () => {
    if (!checkedLogin) {
@@ -102,7 +110,9 @@ transport(program.command('search-flight').description('Live HTTP flights with d
    }
    return searchFlight(flight, client);
   }, process.stdin.isTTY && process.stderr.isTTY ? verifyInBrowser : undefined);
- }));
+ });
+ if(o.table) console.log(liveFlightTable(result));
+ else { output(result); if(process.stdout.isTTY && process.stderr.isTTY) console.error(liveFlightTable(result)); }
 });
 transport(program.command('search-train').description('Verified direct train search; may return future presale schedules')).option('--limit <number>','Limit returned trains after filtering').action(async o=>{
  supported(o,['origin','destination','depDate','journeyType','seatClassName','transportNo','totalDurationHour','sortType','maxPrice','limit','depDateStart','depDateEnd','backDate','backDateStart','backDateEnd','maxDatePairs','depHourStart','depHourEnd','arrHourStart','arrHourEnd']);dates(o);

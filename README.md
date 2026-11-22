@@ -63,6 +63,8 @@ Local state: `~/.config/open-piggy/` (POSIX directory0700, files0600); `OPEN_PIG
 
 ## Flight queries
 
+Successful interactive searches also display a Markdown table of the lowest observed fare for each departure/return date pair. Redirecting stdout keeps the JSON contract. Use `search-flight --table` for Markdown on stdout, or `open-piggy flight-summary result.json` to summarize a saved search or a consolidated snapshot containing dated coverage and quotes. The table marks unknown taxes, unpriced pairs, short stays and dates outside the search separately.
+
 When Fliggy requests verification during an interactive flight search, the CLI opens the affected itinerary in your system default browser. After manual verification, press Enter in the terminal to retry the affected date pair once with the CLI session, or press Ctrl+C to cancel. Browser login and verification state stay in that browser. The website may show prices even if the CLI retry still needs verification.
 
 In unattended runs, the CLI exits with code 4 and includes the official itinerary URL in `error.handoff.url` for manual follow-up. The handoff also includes a `resumeArgs` argument array. After the user completes verification, run those arguments with open-piggy on the same Mac. Keep the matching itinerary tab selected. The reader uses macOS Accessibility and the Swift command-line tools to read the default browser. It never imports browser cookies.
